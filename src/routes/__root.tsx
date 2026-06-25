@@ -2,8 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
+  Navigate,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -11,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { StoreProvider } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/sonner";
@@ -46,10 +49,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center glass rounded-2xl p-10">
         <h1 className="text-xl font-semibold tracking-tight">Esta página não carregou</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Algo deu errado. Você pode tentar novamente ou voltar ao início.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Algo deu errado. Você pode tentar novamente ou voltar ao início.
+        </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Tentar novamente
@@ -106,12 +114,27 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <AppShell>
-          <Outlet />
-        </AppShell>
-        <Toaster />
-      </StoreProvider>
+      <AuthProvider>
+        <AuthGate>
+          <StoreProvider>
+            <AppShell>
+              <Outlet />
+            </AppShell>
+            <Toaster />
+          </StoreProvider>
+        </AuthGate>
+      </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+// Sem usuário logado -> manda pra /login. A própria rota /login redireciona
+// de volta pra "/" se já tiver sessão (ver src/routes/login.tsx).
+function AuthGate({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  if (loading) return null;
+  if (!user && pathname !== "/login") return <Navigate to="/login" />;
+  return <>{children}</>;
 }
