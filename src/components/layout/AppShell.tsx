@@ -8,7 +8,7 @@ const nav = [
   { to: "/projetos", label: "Projetos", icon: FolderKanban },
   { to: "/hoje", label: "Hoje", icon: Sun },
   { to: "/calendario", label: "Calendário", icon: CalendarDays },
-] as const;
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
