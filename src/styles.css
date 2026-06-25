@@ -155,3 +155,59 @@
 @utility shadow-glow {
   box-shadow: var(--shadow-glow);
 }
+
+/* ===== Balões flutuantes (Projetos) — infinite-zoom / efeito Droste ===== */
+@keyframes balloon-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+@utility balloon-float {
+  animation: balloon-float 6s ease-in-out infinite;
+}
+
+@keyframes balloon-zoom-in {
+  0% { transform: scale(0.35); opacity: 0; filter: blur(6px); }
+  60% { transform: scale(1.04); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1); }
+}
+@utility animate-balloon-zoom-in {
+  animation: balloon-zoom-in 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes balloon-scrim-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@utility animate-balloon-scrim-in {
+  animation: balloon-scrim-in 0.3s ease-out;
+}
+
+/* anéis concêntricos que se expandem ao abrir um balão — a "cópia menor de si
+   mesmo" que dá a sensação de zoom recursivo (Droste) sem custo de performance */
+@keyframes balloon-ripple {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0.55; }
+  100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
+}
+@utility balloon-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  border-width: 2px;
+  border-style: solid;
+  pointer-events: none;
+  animation: balloon-ripple 1.1s ease-out forwards;
+}
+@utility balloon-ripple-delay {
+  animation-delay: 0.25s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
