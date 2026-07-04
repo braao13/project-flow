@@ -122,5 +122,13 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["attachments"]["Row"]>;
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      task_status: TaskStatusDB;
+      task_priority: TaskPriorityDB;
+      update_source: UpdateSourceDB;
+    };
+    CompositeTypes: Record<string, never>;
   };
 }
