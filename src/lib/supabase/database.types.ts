@@ -6,6 +6,8 @@ export type TaskStatusDB = "andamento" | "finalizada" | "atrasada";
 export type TaskPriorityDB = "maxima" | "alta" | "nenhuma" | "baixa";
 export type UpdateSourceDB = "web" | "telegram" | "ai";
 
+type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
+
 export interface Database {
   public: {
     Tables: {
@@ -19,8 +21,17 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["profiles"]["Row"]> & { id: string };
-        Update: Partial<Database["public"]["Tables"]["profiles"]["Row"]>;
+        Insert: {
+          id: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          telegram_chat_id?: string | null;
+          ai_preferences?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
       };
       projects: {
         Row: {
@@ -32,12 +43,17 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["projects"]["Row"]> & {
+        Insert: {
           id: string;
           owner_id: string;
           name: string;
+          description?: string | null;
+          color?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["projects"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["projects"]["Insert"]>;
+        Relationships: [];
       };
       tasks: {
         Row: {
@@ -53,13 +69,21 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["tasks"]["Row"]> & {
+        Insert: {
           id: string;
           owner_id: string;
           project_id: string;
           name: string;
+          description?: string | null;
+          status?: TaskStatusDB;
+          priority?: TaskPriorityDB;
+          start_date?: string;
+          due_date?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["tasks"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
+        Relationships: [];
       };
       updates: {
         Row: {
@@ -75,13 +99,21 @@ export interface Database {
           created_at: string;
           updated_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["updates"]["Row"]> & {
+        Insert: {
           id: string;
           owner_id: string;
           task_id: string;
           title: string;
+          description?: string | null;
+          date?: string | null;
+          done?: boolean;
+          position?: number;
+          source?: UpdateSourceDB;
+          created_at?: string;
+          updated_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["updates"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["updates"]["Insert"]>;
+        Relationships: [];
       };
       comments: {
         Row: {
@@ -91,13 +123,15 @@ export interface Database {
           text: string;
           created_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["comments"]["Row"]> & {
+        Insert: {
           id: string;
           owner_id: string;
           task_id: string;
           text: string;
+          created_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["comments"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["comments"]["Insert"]>;
+        Relationships: [];
       };
       attachments: {
         Row: {
@@ -110,7 +144,7 @@ export interface Database {
           storage_path: string;
           created_at: string;
         };
-        Insert: Partial<Database["public"]["Tables"]["attachments"]["Row"]> & {
+        Insert: {
           id: string;
           owner_id: string;
           task_id: string;
@@ -118,9 +152,21 @@ export interface Database {
           type: string;
           size: number;
           storage_path: string;
+          created_at?: string;
         };
-        Update: Partial<Database["public"]["Tables"]["attachments"]["Row"]>;
+        Update: Partial<Database["public"]["Tables"]["attachments"]["Insert"]>;
+        Relationships: [];
       };
     };
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: {
+      task_status: TaskStatusDB;
+      task_priority: TaskPriorityDB;
+      update_source: UpdateSourceDB;
+    };
+    CompositeTypes: { [_ in never]: never };
   };
 }
+
+export type { Json };

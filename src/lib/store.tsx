@@ -263,7 +263,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateProject = useCallback(
     (id: string, data: Partial<Project>) => {
-      const patch: Record<string, unknown> = {};
+      const patch: Database["public"]["Tables"]["projects"]["Update"] = {};
       if ("name" in data) patch.name = data.name;
       if ("description" in data) patch.description = data.description ?? null;
       if ("color" in data) patch.color = data.color ?? null;
@@ -310,7 +310,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const current = (queryClient.getQueryData<Task[]>(["tasks", userId]) ?? []).find((t) => t.id === id);
       const status = "status" in data ? data.status : current ? computeStatus({ ...current, ...data }) : undefined;
 
-      const patch: Record<string, unknown> = {};
+      const patch: Database["public"]["Tables"]["tasks"]["Update"] = {};
       if ("name" in data) patch.name = data.name;
       if ("description" in data) patch.description = data.description ?? null;
       if ("projectId" in data) patch.project_id = data.projectId;
@@ -427,7 +427,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateUpdate = useCallback(
     (id: string, data: Partial<Update>) => {
-      const patch: Record<string, unknown> = {};
+      const patch: Database["public"]["Tables"]["updates"]["Update"] = {};
       if ("title" in data) patch.title = data.title;
       if ("description" in data) patch.description = data.description ?? null;
       if ("date" in data) patch.date = data.date ?? null;
