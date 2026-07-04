@@ -2,10 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
-  Navigate,
   createRootRouteWithContext,
   useRouter,
-  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -13,7 +11,6 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AuthProvider, useAuth } from "@/lib/auth";
 import { StoreProvider } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/sonner";
@@ -118,27 +115,12 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AuthGate>
-          <StoreProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
-            <Toaster />
-          </StoreProvider>
-        </AuthGate>
-      </AuthProvider>
+      <StoreProvider>
+        <AppShell>
+          <Outlet />
+        </AppShell>
+        <Toaster />
+      </StoreProvider>
     </QueryClientProvider>
   );
-}
-
-// Sem usuário logado -> manda pra /login. A própria rota /login redireciona
-// de volta pra "/" se já tiver sessão (ver src/routes/login.tsx).
-function AuthGate({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  if (loading) return null;
-  if (!user && pathname !== "/login") return <Navigate to="/login" />;
-  return <>{children}</>;
 }
