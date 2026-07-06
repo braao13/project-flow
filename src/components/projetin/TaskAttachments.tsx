@@ -15,9 +15,18 @@ function iconFor(type: string) {
 }
 
 export function TaskAttachments({ taskId }: { taskId: string }) {
-  const { getAttachmentsByTask, addAttachment, deleteAttachment } = useStore();
+  const { getAttachmentsByTask, addAttachment, deleteAttachment, getAttachmentUrl } = useStore();
   const files = getAttachmentsByTask(taskId);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const openFile = async (path: string, name: string) => {
+    const url = await getAttachmentUrl(path);
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+  };
 
   return (
     <div className="space-y-3">
@@ -27,9 +36,9 @@ export function TaskAttachments({ taskId }: { taskId: string }) {
           return (
             <li key={f.id} className="glass rounded-lg p-3 flex items-center gap-3 group">
               <Icon className="size-4 text-muted-foreground shrink-0" />
-              <a href={f.dataUrl} download={f.name} className="flex-1 min-w-0 text-sm truncate hover:text-primary">
+              <button onClick={() => openFile(f.path, f.name)} className="flex-1 min-w-0 text-sm truncate hover:text-primary text-left">
                 {f.name}
-              </a>
+              </button>
               <span className="text-xs text-muted-foreground">{humanSize(f.size)}</span>
               <button onClick={() => deleteAttachment(f.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                 <Trash2 className="size-3.5" />
