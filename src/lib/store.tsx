@@ -1,17 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type {
-  Attachment,
-  Comment,
-  Profile,
-  Project,
-  Task,
-  TaskPriority,
-  TaskStatus,
-  Update,
-} from "./types";
-import { effectiveStatus } from "./types";
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { useQuery, useQueryClient, useMutation, type QueryClient } from "@tanstack/react-query";
+import { supabase, ATTACHMENTS_BUCKET } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth/AuthProvider";
+import type { Tables } from "@/lib/supabase/types";
+import type { Attachment, Comment, Profile, Project, Task, TaskPriority, TaskStatus, Update } from "./types";
 
-// Persistência 100% local (localStorage). Sem Supabase / sem autenticação.
+// Conectado ao Supabase. Sem localStorage, sem estado offline — RLS cuida do
+// isolamento de escrita, e todo mundo do time enxerga o workspace inteiro
+// (necessário para o Dashboard "Visão Geral" e para ver tasks atribuídas por
+// outros). A API pública (StoreProvider / useStore) permanece a mesma para
+// manter os componentes existentes intactos.
 
 interface State {
   projects: Project[];
@@ -20,75 +18,180 @@ interface State {
   comments: Comment[];
   attachments: Attachment[];
   profiles: Profile[];
-  /** Conteúdo (data URL) dos anexos, indexado por path. Vive à parte para não inchar o estado principal. */
-  attachmentBlobs: Record<string, string>;
 }
 
-const STORAGE_KEY = "projetin.state.v1";
+const EMPTY: State = { projects: [], tasks: [], updates: [], comments: [], attachments: [], profiles: [] };
 
-const LOCAL_USER: Profile = {
-  id: "local-user",
-  username: "voce",
-  fullName: "Você",
-  email: "voce@projetin.local",
-  avatarUrl: null,
+// ---------- mapeadores DB (snake_case) -> frontend (camelCase) ----------
+
+function mapProject(row: Tables<"projects">): Project {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description ?? undefined,
+    color: row.color ?? undefined,
+    createdAt: row.created_at,
+    ownerId: row.owner_id,
+  };
+}
+
+function mapTask(row: Tables<"tasks">): Task {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.title,
+    description: row.description ?? undefined,
+    status: row.status,
+    priority: row.priority,
+    startDate: row.start_date ?? row.created_at,
+    dueDate: row.due_date ?? undefined,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    responsibleUserId: row.responsible_user_id,
+  };
+}
+
+function mapUpdate(row: Tables<"task_updates">): Update {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    title: row.title,
+    description: row.description ?? undefined,
+    date: row.scheduled_date ?? undefined,
+    done: row.completed,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    responsibleUserId: row.responsible_user_id,
+  };
+}
+
+function mapComment(row: Tables<"comments">): Comment {
+  return { id: row.id, taskId: row.task_id, text: row.content, createdAt: row.created_at, authorId: row.author_id };
+}
+
+function mapAttachment(row: Tables<"attachments">): Attachment {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    name: row.file_name,
+    type: row.mime_type ?? "application/octet-stream",
+    size: row.file_size ?? 0,
+    path: row.file_path,
+    createdAt: row.created_at,
+    uploadedBy: row.uploaded_by,
+  };
+}
+
+function mapProfile(row: Tables<"profiles">): Profile {
+  return { id: row.id, username: row.username, fullName: row.full_name, email: row.email, avatarUrl: row.avatar_url };
+}
+
+// ---------- queries ----------
+
+const KEYS = {
+  projects: ["projects"] as const,
+  tasks: ["tasks"] as const,
+  updates: ["task_updates"] as const,
+  comments: ["comments"] as const,
+  attachments: ["attachments"] as const,
+  profiles: ["profiles"] as const,
 };
 
-const EMPTY: State = {
-  projects: [],
-  tasks: [],
-  updates: [],
-  comments: [],
-  attachments: [],
-  profiles: [LOCAL_USER],
-  attachmentBlobs: {},
-};
-
-function loadState(): State {
-  if (typeof window === "undefined") return EMPTY;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY;
-    const parsed = JSON.parse(raw) as Partial<State>;
-    return {
-      projects: parsed.projects ?? [],
-      tasks: parsed.tasks ?? [],
-      updates: parsed.updates ?? [],
-      comments: parsed.comments ?? [],
-      attachments: parsed.attachments ?? [],
-      profiles: parsed.profiles && parsed.profiles.length > 0 ? parsed.profiles : [LOCAL_USER],
-      attachmentBlobs: parsed.attachmentBlobs ?? {},
-    };
-  } catch {
-    return EMPTY;
-  }
-}
-
-function saveState(state: State) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // ignore
-  }
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function newId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
+function useProjectsQuery() {
+  return useQuery({
+    queryKey: KEYS.projects,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: true });
+      if (error) throw error;
+      return data.map(mapProject);
+    },
   });
+}
+
+function useTasksQuery() {
+  return useQuery({
+    queryKey: KEYS.tasks,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: true });
+      if (error) throw error;
+      return data.map(mapTask);
+    },
+  });
+}
+
+function useUpdatesQuery() {
+  return useQuery({
+    queryKey: KEYS.updates,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("task_updates")
+        .select("*")
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return data.map(mapUpdate);
+    },
+  });
+}
+
+function useCommentsQuery() {
+  return useQuery({
+    queryKey: KEYS.comments,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("comments").select("*").order("created_at", { ascending: true });
+      if (error) throw error;
+      return data.map(mapComment);
+    },
+  });
+}
+
+function useAttachmentsQuery() {
+  return useQuery({
+    queryKey: KEYS.attachments,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("attachments").select("*").order("created_at", { ascending: true });
+      if (error) throw error;
+      return data.map(mapAttachment);
+    },
+  });
+}
+
+function useProfilesQuery() {
+  return useQuery({
+    queryKey: KEYS.profiles,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("profiles").select("*").order("full_name", { ascending: true });
+      if (error) throw error;
+      return data.map(mapProfile);
+    },
+  });
+}
+
+/** Realtime: qualquer INSERT/UPDATE/DELETE nas tabelas invalida a query correspondente. */
+function useRealtimeSync(queryClient: QueryClient) {
+  useEffect(() => {
+    const channel = supabase
+      .channel("projetin-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, () =>
+        queryClient.invalidateQueries({ queryKey: KEYS.projects }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, () =>
+        queryClient.invalidateQueries({ queryKey: KEYS.tasks }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "task_updates" }, () =>
+        queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () =>
+        queryClient.invalidateQueries({ queryKey: KEYS.comments }),
+      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "attachments" }, () =>
+        queryClient.invalidateQueries({ queryKey: KEYS.attachments }),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 }
 
 // ---------- API pública ----------
@@ -118,6 +221,7 @@ interface StoreApi {
   deleteTask: (id: string) => void;
   toggleTaskDone: (id: string) => void;
   setTaskPriority: (id: string, p: TaskPriority) => void;
+  /** Step 6 — reatribuir o responsável de uma task. */
   setTaskResponsible: (id: string, responsibleUserId: string | null) => void;
 
   createUpdate: (data: {
@@ -130,6 +234,7 @@ interface StoreApi {
   updateUpdate: (id: string, data: Partial<Pick<Update, "title" | "description" | "date">>) => void;
   deleteUpdate: (id: string) => void;
   toggleUpdate: (id: string) => void;
+  /** Step 7 — atribuir responsável a uma atualização específica da timeline. */
   setUpdateResponsible: (id: string, responsibleUserId: string | null) => void;
 
   addComment: (taskId: string, text: string) => void;
@@ -148,209 +253,318 @@ interface StoreApi {
 const StoreContext = createContext<StoreApi | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<State>(EMPTY);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const currentUserId = profile?.id;
 
-  useEffect(() => {
-    setState(loadState());
-    setLoading(false);
-  }, []);
+  useRealtimeSync(queryClient);
 
-  useEffect(() => {
-    if (loading) return;
-    saveState(state);
-  }, [state, loading]);
+  const projectsQ = useProjectsQuery();
+  const tasksQ = useTasksQuery();
+  const updatesQ = useUpdatesQuery();
+  const commentsQ = useCommentsQuery();
+  const attachmentsQ = useAttachmentsQuery();
+  const profilesQ = useProfilesQuery();
 
-  const currentUserId = LOCAL_USER.id;
+  const loading =
+    projectsQ.isLoading || tasksQ.isLoading || updatesQ.isLoading || commentsQ.isLoading || attachmentsQ.isLoading;
 
-  const api = useMemo<StoreApi>(() => {
-    const update = (fn: (s: State) => State) => setState((prev) => fn(prev));
+  const state: State = {
+    projects: projectsQ.data ?? [],
+    tasks: tasksQ.data ?? [],
+    updates: updatesQ.data ?? [],
+    comments: commentsQ.data ?? [],
+    attachments: attachmentsQ.data ?? [],
+    profiles: profilesQ.data ?? [],
+  };
 
-    return {
+  // ---------- projects ----------
+
+  const createProjectMut = useMutation({
+    mutationFn: async (data: { name: string; description?: string; color?: string }) => {
+      if (!currentUserId) throw new Error("Usuário não autenticado.");
+      const { data: row, error } = await supabase
+        .from("projects")
+        .insert({ name: data.name, description: data.description, color: data.color, owner_id: currentUserId })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return mapProject(row);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.projects }),
+  });
+
+  const updateProjectMut = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<Project, "name" | "description" | "color">> }) => {
+      const { error } = await supabase.from("projects").update(data).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.projects }),
+  });
+
+  const deleteProjectMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.projects });
+      queryClient.invalidateQueries({ queryKey: KEYS.tasks });
+    },
+  });
+
+  // ---------- tasks ----------
+
+  const createTaskMut = useMutation({
+    mutationFn: async (data: {
+      projectId: string;
+      name: string;
+      description?: string;
+      priority?: TaskPriority;
+      startDate: string;
+      dueDate?: string;
+      responsibleUserId?: string | null;
+    }) => {
+      if (!currentUserId) throw new Error("Usuário não autenticado.");
+      const { data: row, error } = await supabase
+        .from("tasks")
+        .insert({
+          project_id: data.projectId,
+          title: data.name,
+          description: data.description,
+          priority: data.priority ?? "nenhuma",
+          start_date: data.startDate,
+          due_date: data.dueDate,
+          created_by: currentUserId,
+          responsible_user_id: data.responsibleUserId ?? currentUserId,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return mapTask(row);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.tasks }),
+  });
+
+  const updateTaskMut = useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status">>;
+    }) => {
+      const payload: Record<string, unknown> = {};
+      if (data.name !== undefined) payload.title = data.name;
+      if (data.description !== undefined) payload.description = data.description;
+      if (data.priority !== undefined) payload.priority = data.priority;
+      if (data.startDate !== undefined) payload.start_date = data.startDate;
+      if (data.dueDate !== undefined) payload.due_date = data.dueDate;
+      if (data.status !== undefined) payload.status = data.status;
+      const { error } = await supabase.from("tasks").update(payload).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.tasks }),
+  });
+
+  const deleteTaskMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tasks").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: KEYS.tasks });
+      queryClient.invalidateQueries({ queryKey: KEYS.updates });
+      queryClient.invalidateQueries({ queryKey: KEYS.comments });
+      queryClient.invalidateQueries({ queryKey: KEYS.attachments });
+    },
+  });
+
+  const setTaskResponsibleMut = useMutation({
+    mutationFn: async ({ id, responsibleUserId }: { id: string; responsibleUserId: string | null }) => {
+      const { error } = await supabase.from("tasks").update({ responsible_user_id: responsibleUserId }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.tasks }),
+  });
+
+  // ---------- updates (timeline) ----------
+
+  const createUpdateMut = useMutation({
+    mutationFn: async (data: {
+      taskId: string;
+      title: string;
+      description?: string;
+      date?: string;
+      responsibleUserId?: string | null;
+    }) => {
+      if (!currentUserId) throw new Error("Usuário não autenticado.");
+      const { data: row, error } = await supabase
+        .from("task_updates")
+        .insert({
+          task_id: data.taskId,
+          title: data.title,
+          description: data.description,
+          scheduled_date: data.date,
+          responsible_user_id: data.responsibleUserId,
+          created_by: currentUserId,
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return mapUpdate(row);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+  });
+
+  const updateUpdateMut = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<Update, "title" | "description" | "date">> }) => {
+      const payload: Record<string, unknown> = {};
+      if (data.title !== undefined) payload.title = data.title;
+      if (data.description !== undefined) payload.description = data.description;
+      if (data.date !== undefined) payload.scheduled_date = data.date;
+      const { error } = await supabase.from("task_updates").update(payload).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+  });
+
+  const deleteUpdateMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("task_updates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+  });
+
+  const toggleUpdateMut = useMutation({
+    mutationFn: async (id: string) => {
+      const current = state.updates.find((u) => u.id === id);
+      if (!current) return;
+      const { error } = await supabase.from("task_updates").update({ completed: !current.done }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+  });
+
+  const setUpdateResponsibleMut = useMutation({
+    mutationFn: async ({ id, responsibleUserId }: { id: string; responsibleUserId: string | null }) => {
+      const { error } = await supabase
+        .from("task_updates")
+        .update({ responsible_user_id: responsibleUserId })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.updates }),
+  });
+
+  // ---------- comments ----------
+
+  const addCommentMut = useMutation({
+    mutationFn: async ({ taskId, text }: { taskId: string; text: string }) => {
+      if (!currentUserId) throw new Error("Usuário não autenticado.");
+      const { error } = await supabase
+        .from("comments")
+        .insert({ task_id: taskId, content: text, author_id: currentUserId });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.comments }),
+  });
+
+  const deleteCommentMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("comments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.comments }),
+  });
+
+  // ---------- attachments ----------
+
+  const addAttachmentMut = useMutation({
+    mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
+      if (!currentUserId) throw new Error("Usuário não autenticado.");
+      const path = `${taskId}/${crypto.randomUUID()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file);
+      if (uploadError) throw uploadError;
+
+      const { error } = await supabase.from("attachments").insert({
+        task_id: taskId,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: currentUserId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.attachments }),
+  });
+
+  const deleteAttachmentMut = useMutation({
+    mutationFn: async (id: string) => {
+      const attachment = state.attachments.find((a) => a.id === id);
+      if (attachment) {
+        await supabase.storage.from(ATTACHMENTS_BUCKET).remove([attachment.path]);
+      }
+      const { error } = await supabase.from("attachments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.attachments }),
+  });
+
+  async function getAttachmentUrl(path: string) {
+    const { data, error } = await supabase.storage.from(ATTACHMENTS_BUCKET).createSignedUrl(path, 60 * 10);
+    if (error) return null;
+    return data.signedUrl;
+  }
+
+  // ---------- getters derivados ----------
+
+  const getTasksByProject = (projectId: string) => state.tasks.filter((t) => t.projectId === projectId);
+  const getUpdatesByTask = (taskId: string) =>
+    state.updates.filter((u) => u.taskId === taskId).sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+  const getCommentsByTask = (taskId: string) =>
+    state.comments.filter((c) => c.taskId === taskId).sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+  const getAttachmentsByTask = (taskId: string) =>
+    state.attachments.filter((a) => a.taskId === taskId).sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+
+  const api = useMemo<StoreApi>(
+    () => ({
       state,
       loading,
       currentUserId,
-
-      // ---------- projects ----------
-      createProject: async ({ name, description, color }) => {
-        const project: Project = {
-          id: newId(),
-          name,
-          description,
-          color,
-          createdAt: nowIso(),
-          ownerId: currentUserId,
-        };
-        update((s) => ({ ...s, projects: [...s.projects, project] }));
-        return project;
-      },
-      updateProject: (id, data) => {
-        update((s) => ({
-          ...s,
-          projects: s.projects.map((p) => (p.id === id ? { ...p, ...data } : p)),
-        }));
-      },
-      deleteProject: (id) => {
-        update((s) => {
-          const taskIds = new Set(s.tasks.filter((t) => t.projectId === id).map((t) => t.id));
-          return {
-            ...s,
-            projects: s.projects.filter((p) => p.id !== id),
-            tasks: s.tasks.filter((t) => t.projectId !== id),
-            updates: s.updates.filter((u) => !taskIds.has(u.taskId)),
-            comments: s.comments.filter((c) => !taskIds.has(c.taskId)),
-            attachments: s.attachments.filter((a) => !taskIds.has(a.taskId)),
-          };
-        });
-      },
-
-      // ---------- tasks ----------
-      createTask: async ({ projectId, name, description, priority, startDate, dueDate, responsibleUserId }) => {
-        const task: Task = {
-          id: newId(),
-          projectId,
-          name,
-          description,
-          status: "andamento",
-          priority: priority ?? "nenhuma",
-          startDate,
-          dueDate,
-          createdAt: nowIso(),
-          createdBy: currentUserId,
-          responsibleUserId: responsibleUserId ?? currentUserId,
-        };
-        update((s) => ({ ...s, tasks: [...s.tasks, task] }));
-        return task;
-      },
-      updateTask: (id, data) => {
-        update((s) => ({
-          ...s,
-          tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...data } : t)),
-        }));
-      },
-      deleteTask: (id) => {
-        update((s) => ({
-          ...s,
-          tasks: s.tasks.filter((t) => t.id !== id),
-          updates: s.updates.filter((u) => u.taskId !== id),
-          comments: s.comments.filter((c) => c.taskId !== id),
-          attachments: s.attachments.filter((a) => a.taskId !== id),
-        }));
-      },
+      createProject: (data) => createProjectMut.mutateAsync(data),
+      updateProject: (id, data) => updateProjectMut.mutate({ id, data }),
+      deleteProject: (id) => deleteProjectMut.mutate(id),
+      createTask: (data) => createTaskMut.mutateAsync(data),
+      updateTask: (id, data) => updateTaskMut.mutate({ id, data }),
+      deleteTask: (id) => deleteTaskMut.mutate(id),
       toggleTaskDone: (id) => {
-        update((s) => ({
-          ...s,
-          tasks: s.tasks.map((t) => {
-            if (t.id !== id) return t;
-            const newStatus: TaskStatus = t.status === "finalizada" ? effectiveStatus({ status: "andamento", dueDate: t.dueDate }) : "finalizada";
-            return { ...t, status: newStatus };
-          }),
-        }));
+        const task = state.tasks.find((t) => t.id === id);
+        if (!task) return;
+        updateTaskMut.mutate({ id, data: { status: task.status === "finalizada" ? "andamento" : "finalizada" } });
       },
-      setTaskPriority: (id, p) => {
-        update((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, priority: p } : t)) }));
-      },
-      setTaskResponsible: (id, responsibleUserId) => {
-        update((s) => ({
-          ...s,
-          tasks: s.tasks.map((t) => (t.id === id ? { ...t, responsibleUserId } : t)),
-        }));
-      },
-
-      // ---------- updates ----------
-      createUpdate: async ({ taskId, title, description, date, responsibleUserId }) => {
-        const upd: Update = {
-          id: newId(),
-          taskId,
-          title,
-          description,
-          date,
-          done: false,
-          createdAt: nowIso(),
-          createdBy: currentUserId,
-          responsibleUserId: responsibleUserId ?? null,
-        };
-        update((s) => ({ ...s, updates: [...s.updates, upd] }));
-        return upd;
-      },
-      updateUpdate: (id, data) => {
-        update((s) => ({
-          ...s,
-          updates: s.updates.map((u) => (u.id === id ? { ...u, ...data } : u)),
-        }));
-      },
-      deleteUpdate: (id) => {
-        update((s) => ({ ...s, updates: s.updates.filter((u) => u.id !== id) }));
-      },
-      toggleUpdate: (id) => {
-        update((s) => ({
-          ...s,
-          updates: s.updates.map((u) => (u.id === id ? { ...u, done: !u.done } : u)),
-        }));
-      },
-      setUpdateResponsible: (id, responsibleUserId) => {
-        update((s) => ({
-          ...s,
-          updates: s.updates.map((u) => (u.id === id ? { ...u, responsibleUserId } : u)),
-        }));
-      },
-
-      // ---------- comments ----------
-      addComment: (taskId, text) => {
-        const c: Comment = {
-          id: newId(),
-          taskId,
-          text,
-          createdAt: nowIso(),
-          authorId: currentUserId,
-        };
-        update((s) => ({ ...s, comments: [...s.comments, c] }));
-      },
-      deleteComment: (id) => {
-        update((s) => ({ ...s, comments: s.comments.filter((c) => c.id !== id) }));
-      },
-
-      // ---------- attachments ----------
-      addAttachment: async (taskId, file) => {
-        const dataUrl = await readFileAsDataUrl(file);
-        const path = `${taskId}/${newId()}-${file.name}`;
-        const att: Attachment = {
-          id: newId(),
-          taskId,
-          name: file.name,
-          type: file.type || "application/octet-stream",
-          size: file.size,
-          path,
-          createdAt: nowIso(),
-          uploadedBy: currentUserId,
-        };
-        update((s) => ({
-          ...s,
-          attachments: [...s.attachments, att],
-          attachmentBlobs: { ...s.attachmentBlobs, [path]: dataUrl },
-        }));
-      },
-      deleteAttachment: (id) => {
-        update((s) => {
-          const att = s.attachments.find((a) => a.id === id);
-          const blobs = { ...s.attachmentBlobs };
-          if (att) delete blobs[att.path];
-          return {
-            ...s,
-            attachments: s.attachments.filter((a) => a.id !== id),
-            attachmentBlobs: blobs,
-          };
-        });
-      },
-      getAttachmentUrl: async (path) => state.attachmentBlobs[path] ?? null,
-
-      // ---------- selectors ----------
-      getTasksByProject: (projectId) => state.tasks.filter((t) => t.projectId === projectId),
-      getUpdatesByTask: (taskId) => state.updates.filter((u) => u.taskId === taskId),
-      getCommentsByTask: (taskId) => state.comments.filter((c) => c.taskId === taskId),
-      getAttachmentsByTask: (taskId) => state.attachments.filter((a) => a.taskId === taskId),
-    };
-  }, [state, loading, currentUserId]);
+      setTaskPriority: (id, p) => updateTaskMut.mutate({ id, data: { priority: p } }),
+      setTaskResponsible: (id, responsibleUserId) => setTaskResponsibleMut.mutate({ id, responsibleUserId }),
+      createUpdate: (data) => createUpdateMut.mutateAsync(data),
+      updateUpdate: (id, data) => updateUpdateMut.mutate({ id, data }),
+      deleteUpdate: (id) => deleteUpdateMut.mutate(id),
+      toggleUpdate: (id) => toggleUpdateMut.mutate(id),
+      setUpdateResponsible: (id, responsibleUserId) => setUpdateResponsibleMut.mutate({ id, responsibleUserId }),
+      addComment: (taskId, text) => addCommentMut.mutate({ taskId, text }),
+      deleteComment: (id) => deleteCommentMut.mutate(id),
+      addAttachment: (taskId, file) => addAttachmentMut.mutateAsync({ taskId, file }),
+      deleteAttachment: (id) => deleteAttachmentMut.mutate(id),
+      getAttachmentUrl,
+      getTasksByProject,
+      getUpdatesByTask,
+      getCommentsByTask,
+      getAttachmentsByTask,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, loading, currentUserId],
+  );
 
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
@@ -359,4 +573,14 @@ export function useStore() {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error("useStore must be used within StoreProvider");
   return ctx;
+}
+
+export function useProject(id: string | undefined) {
+  const { state } = useStore();
+  return useMemo(() => state.projects.find((p) => p.id === id), [state.projects, id]);
+}
+
+export function useTask(id: string | undefined) {
+  const { state } = useStore();
+  return useMemo(() => state.tasks.find((t) => t.id === id), [state.tasks, id]);
 }

@@ -4,6 +4,8 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -11,9 +13,13 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider, useAuth } from "@/lib/auth/AuthProvider";
 import { StoreProvider } from "@/lib/store";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/sonner";
+
+// Rotas acessíveis sem sessão / sem first_login_completed.
+const PUBLIC_ROUTES = ["/login", "/trocar-senha"];
 
 function NotFoundComponent() {
   return (
@@ -85,8 +91,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Dashboard — Projetin" },
       { name: "twitter:description", content: "Visão geral das suas tasks, entregas e produtividade." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b8ab2c8c-d009-4703-a1d3-d220bef0a0ef/id-preview-e58a9eca--122de352-3847-4b50-9352-d9784f237a00.lovable.app-1782406179763.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b8ab2c8c-d009-4703-a1d3-d220bef0a0ef/id-preview-e58a9eca--122de352-3847-4b50-9352-d9784f237a00.lovable.app-1782406179763.png" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -115,12 +119,61 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <AppShell>
+      <AuthProvider>
+        <AuthGate>
           <Outlet />
-        </AppShell>
+        </AuthGate>
         <Toaster />
-      </StoreProvider>
+      </AuthProvider>
     </QueryClientProvider>
+  );
+}
+
+/**
+ * Decide o que renderizar com base no estado de autenticação:
+ * - /login e /trocar-senha sempre renderizam livremente (cada uma cuida do
+ *   próprio redirecionamento quando não faz sentido estar ali).
+ * - Sem sessão -> manda para /login.
+ * - Sessão sem first_login_completed -> manda para /trocar-senha (Step 4,
+ *   não pode ser pulado).
+ * - Caso contrário, app completo dentro do StoreProvider + AppShell.
+ */
+function AuthGate({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { session, profile, loading } = useAuth();
+  const navigate = useNavigate();
+  const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!session && !isPublicRoute) {
+      navigate({ to: "/login" });
+    } else if (session && profile && !profile.first_login_completed && pathname !== "/trocar-senha") {
+      navigate({ to: "/trocar-senha" });
+    }
+  }, [loading, session, profile, pathname, isPublicRoute, navigate]);
+
+  if (loading) {
+    return (
+      <div className="dark min-h-screen grid place-items-center">
+        <div className="text-sm text-muted-foreground animate-pulse">Carregando…</div>
+      </div>
+    );
+  }
+
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
+  // Sem sessão válida ou senha temporária ainda ativa: o useEffect acima já
+  // disparou o redirect, aqui só evitamos piscar o app por trás.
+  if (!session || (profile && !profile.first_login_completed)) {
+    return null;
+  }
+
+  return (
+    <StoreProvider>
+      <AppShell>{children}</AppShell>
+    </StoreProvider>
   );
 }

@@ -9,16 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrocarSenhaRouteImport } from './routes/trocar-senha'
 import { Route as ProjetosRouteImport } from './routes/projetos'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as HojeRouteImport } from './routes/hoje'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjetosIndexRouteImport } from './routes/projetos.index'
 import { Route as ProjetosIdRouteImport } from './routes/projetos.$id'
 
+const TrocarSenhaRoute = TrocarSenhaRouteImport.update({
+  id: '/trocar-senha',
+  path: '/trocar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjetosRoute = ProjetosRouteImport.update({
   id: '/projetos',
   path: '/projetos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HojeRoute = HojeRouteImport.update({
@@ -51,7 +63,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/hoje': typeof HojeRoute
+  '/login': typeof LoginRoute
   '/projetos': typeof ProjetosRouteWithChildren
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
@@ -59,6 +73,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/hoje': typeof HojeRoute
+  '/login': typeof LoginRoute
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos': typeof ProjetosIndexRoute
 }
@@ -67,22 +83,40 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/calendario': typeof CalendarioRoute
   '/hoje': typeof HojeRoute
+  '/login': typeof LoginRoute
   '/projetos': typeof ProjetosRouteWithChildren
+  '/trocar-senha': typeof TrocarSenhaRoute
   '/projetos/$id': typeof ProjetosIdRoute
   '/projetos/': typeof ProjetosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/calendario' | '/hoje' | '/projetos' | '/projetos/$id' | '/projetos/'
+    | '/'
+    | '/calendario'
+    | '/hoje'
+    | '/login'
+    | '/projetos'
+    | '/trocar-senha'
+    | '/projetos/$id'
+    | '/projetos/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/calendario' | '/hoje' | '/projetos/$id' | '/projetos'
+  to:
+    | '/'
+    | '/calendario'
+    | '/hoje'
+    | '/login'
+    | '/trocar-senha'
+    | '/projetos/$id'
+    | '/projetos'
   id:
     | '__root__'
     | '/'
     | '/calendario'
     | '/hoje'
+    | '/login'
     | '/projetos'
+    | '/trocar-senha'
     | '/projetos/$id'
     | '/projetos/'
   fileRoutesById: FileRoutesById
@@ -91,16 +125,32 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CalendarioRoute: typeof CalendarioRoute
   HojeRoute: typeof HojeRoute
+  LoginRoute: typeof LoginRoute
   ProjetosRoute: typeof ProjetosRouteWithChildren
+  TrocarSenhaRoute: typeof TrocarSenhaRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trocar-senha': {
+      id: '/trocar-senha'
+      path: '/trocar-senha'
+      fullPath: '/trocar-senha'
+      preLoaderRoute: typeof TrocarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projetos': {
       id: '/projetos'
       path: '/projetos'
       fullPath: '/projetos'
       preLoaderRoute: typeof ProjetosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hoje': {
@@ -159,18 +209,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CalendarioRoute: CalendarioRoute,
   HojeRoute: HojeRoute,
+  LoginRoute: LoginRoute,
   ProjetosRoute: ProjetosRouteWithChildren,
+  TrocarSenhaRoute: TrocarSenhaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
