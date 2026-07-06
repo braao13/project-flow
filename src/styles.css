@@ -247,13 +247,14 @@
 @utility border-interactive {
   border-color: var(--border);
   transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-@utility border-interactive:hover {
-  border-color: var(--border-hover);
-}
-@utility border-interactive:focus-visible {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 25%, transparent);
+
+  &:hover {
+    border-color: var(--border-hover);
+  }
+  &:focus-visible {
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 25%, transparent);
+  }
 }
 
 /* ===== Balões flutuantes (Projetos) — infinite-zoom / efeito Droste ===== */
