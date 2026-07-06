@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
-import { useProject, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { TaskAccordion } from "@/components/projetin/TaskAccordion";
 import { TaskDialog } from "@/components/projetin/TaskDialog";
 import { ProjectDialog } from "@/components/projetin/ProjectDialog";
