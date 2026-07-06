@@ -5,11 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Cards 16px / Botões e Inputs 12px / Dialogs e Floating Panels 20px
+     --radius = 12px cobre botões/inputs; radius-xl (12+4=16) cobre cards;
+     radius-2xl (12+8=20) cobre dialogs e floating panels. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -33,6 +37,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-info: var(--info);
   --color-glow: var(--glow);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -50,68 +55,108 @@
 }
 
 :root {
+  /* Botões / Inputs = 12px (base). Cards = 16px (radius-xl). Dialogs/Floating = 20px (radius-2xl). */
   --radius: 0.75rem;
 
-  /* Premium dark base */
-  --background: oklch(0.13 0.012 270);
-  --foreground: oklch(0.97 0.005 270);
+  /* ===================================================================
+     DESIGN SYSTEM — IAOTRIX
+     Fonte da verdade: paleta oficial fornecida. Não hardcodear cores nos
+     componentes — tudo deve consumir estas variáveis (ou as classes @utility
+     abaixo), para que Telegram/IA (fases 2 e 3) herdem o mesmo visual sem
+     retrabalho.
+     =================================================================== */
 
-  --card: oklch(0.18 0.013 270 / 60%);
-  --card-foreground: oklch(0.97 0.005 270);
+  /* ---- Backgrounds (camadas) ---- */
+  --background: #050505; /* Primary Background */
+  --background-secondary: #0b0b0b; /* Secondary Background */
+  --surface: #121212; /* Surface */
+  --surface-elevated: #181818; /* Elevated Surface */
+  --card: #161616; /* Card */
+  --sidebar: #0d0d0d; /* Sidebar */
+  --modal: #141414; /* Modal */
+  --popover: var(--modal);
 
-  --popover: oklch(0.17 0.013 270);
-  --popover-foreground: oklch(0.97 0.005 270);
+  /* ---- Texto ---- */
+  --foreground: #ffffff; /* Primary Text */
+  --text-secondary: #b8b8b8; /* Secondary Text */
+  --text-muted: #7c7c7c; /* Muted Text */
+  --text-disabled: #5e5e5e; /* Disabled Text */
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.72 0.17 290);
-  --primary-foreground: oklch(0.12 0.01 270);
+  /* ---- Bordas ---- */
+  --border: rgba(255, 255, 255, 0.08); /* Default Border */
+  --border-hover: rgba(255, 255, 255, 0.15); /* Hover Border */
+  --border-focus: #4da3ff; /* Focused Border */
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: var(--border-focus);
 
-  --secondary: oklch(0.24 0.015 270);
-  --secondary-foreground: oklch(0.97 0.005 270);
+  /* ---- Marca (Primary Brand) ---- */
+  --primary: #3b82f6; /* Primary Blue */
+  --primary-hover: #2563eb; /* Primary Blue Hover */
+  --primary-soft: rgba(59, 130, 246, 0.15); /* Primary Blue Soft */
+  --primary-foreground: #ffffff;
 
-  --muted: oklch(0.22 0.012 270);
-  --muted-foreground: oklch(0.65 0.015 270);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--foreground);
 
-  --accent: oklch(0.28 0.04 290);
-  --accent-foreground: oklch(0.97 0.005 270);
+  --muted: var(--surface);
+  --muted-foreground: var(--text-muted);
 
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.98 0.005 0);
+  --accent: var(--primary-soft);
+  --accent-foreground: #ffffff;
 
-  --border: oklch(1 0 0 / 8%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.72 0.17 290);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
 
-  --success: oklch(0.72 0.17 155);
-  --warning: oklch(0.78 0.17 80);
-  --danger: oklch(0.65 0.23 22);
-  --glow: oklch(0.72 0.2 295);
+  /* ---- Acentos ---- */
+  --accent-cyan: #38bdf8;
+  --accent-purple: #7c3aed;
+  --glow-blue: rgba(59, 130, 246, 0.35); /* Blue Glow */
+  --glow-purple: rgba(124, 58, 237, 0.25); /* Purple Glow */
+  --glow: var(--glow-blue);
 
-  --chart-1: oklch(0.72 0.17 290);
-  --chart-2: oklch(0.72 0.17 155);
-  --chart-3: oklch(0.78 0.17 80);
-  --chart-4: oklch(0.65 0.23 22);
-  --chart-5: oklch(0.7 0.15 210);
+  /* ---- Status ---- */
+  --success: #22c55e;
+  --warning: #facc15;
+  --danger: #ef4444;
+  --info: #3b82f6;
 
-  --sidebar: oklch(0.15 0.012 270 / 70%);
-  --sidebar-foreground: oklch(0.92 0.005 270);
-  --sidebar-primary: oklch(0.72 0.17 290);
-  --sidebar-primary-foreground: oklch(0.12 0.01 270);
-  --sidebar-accent: oklch(0.22 0.015 270);
-  --sidebar-accent-foreground: oklch(0.97 0.005 270);
-  --sidebar-border: oklch(1 0 0 / 6%);
-  --sidebar-ring: oklch(0.72 0.17 290);
+  /* Glows de status (task border + background glow ao selecionar) */
+  --success-glow: rgba(34, 197, 94, 0.15);
+  --warning-glow: rgba(250, 204, 21, 0.15);
+  --danger-glow: rgba(239, 68, 68, 0.15);
 
-  --gradient-primary: linear-gradient(135deg, oklch(0.72 0.17 290), oklch(0.65 0.2 320));
-  --gradient-mesh: radial-gradient(at 20% 10%, oklch(0.4 0.2 290 / 35%) 0px, transparent 50%),
-    radial-gradient(at 80% 0%, oklch(0.4 0.2 320 / 25%) 0px, transparent 50%),
-    radial-gradient(at 80% 90%, oklch(0.4 0.2 220 / 25%) 0px, transparent 50%);
-  --shadow-glow: 0 0 40px -10px oklch(0.72 0.2 295 / 40%);
-  --shadow-elegant: 0 10px 30px -10px oklch(0 0 0 / 60%);
+  /* Paleta de gráficos — reaproveita os acentos da marca em vez de cores soltas */
+  --chart-1: var(--primary);
+  --chart-2: var(--accent-cyan);
+  --chart-3: var(--accent-purple);
+  --chart-4: var(--success);
+  --chart-5: var(--accent-cyan);
+
+  /* ---- Sidebar ---- */
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--primary-soft);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--border-focus);
+
+  /* ---- Gradientes e sombras ----
+     Glows sempre sutis (10%–20% de opacidade), nunca cores saturadas em
+     área grande. Sombra padrão é suave, sem preto pesado. */
+  --gradient-primary: linear-gradient(135deg, var(--primary), var(--accent-purple));
+  --gradient-mesh: radial-gradient(at 20% 10%, rgba(59, 130, 246, 0.14) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(124, 58, 237, 0.12) 0px, transparent 50%),
+    radial-gradient(at 80% 90%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+  --shadow-glow: 0 0 40px -10px var(--glow-blue);
+  --shadow-elegant: 0 10px 30px -10px rgba(0, 0, 0, 0.35);
 }
 
 .dark {
-  --background: oklch(0.13 0.012 270);
-  --foreground: oklch(0.97 0.005 270);
+  --background: #050505;
+  --foreground: #ffffff;
 }
 
 @layer base {
@@ -133,14 +178,16 @@
   }
 }
 
+/* Glassmorphism reservado a elementos flutuantes (sidebar, modais, dropdowns) —
+   blur entre 16px e 24px conforme o Design System. */
 @utility glass {
-  background: color-mix(in oklab, var(--card) 60%, transparent);
-  backdrop-filter: blur(20px) saturate(140%);
+  background: color-mix(in srgb, var(--card) 60%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
   border: 1px solid var(--border);
 }
 
 @utility glass-strong {
-  background: color-mix(in oklab, var(--card) 85%, transparent);
+  background: color-mix(in srgb, var(--card) 85%, transparent);
   backdrop-filter: blur(24px) saturate(160%);
   border: 1px solid var(--border);
 }
@@ -154,6 +201,59 @@
 
 @utility shadow-glow {
   box-shadow: var(--shadow-glow);
+}
+
+@utility shadow-elegant {
+  box-shadow: var(--shadow-elegant);
+}
+
+/* Hierarquia de texto secundária/muted/disabled da IAOTRIX, para uso direto
+   sem precisar hardcodear cor em componente. */
+@utility text-secondary {
+  color: var(--text-secondary);
+}
+
+@utility text-disabled {
+  color: var(--text-disabled);
+}
+
+/* Camadas de superfície adicionais (além de background/card já mapeados no tema) */
+@utility bg-surface {
+  background-color: var(--surface);
+}
+
+@utility bg-surface-elevated {
+  background-color: var(--surface-elevated);
+}
+
+@utility bg-modal {
+  background-color: var(--modal);
+}
+
+/* Glow de status por trás da task selecionada — sutil, nunca saturado */
+@utility glow-success {
+  box-shadow: 0 0 32px -8px var(--success-glow);
+}
+
+@utility glow-warning {
+  box-shadow: 0 0 32px -8px var(--warning-glow);
+}
+
+@utility glow-danger {
+  box-shadow: 0 0 32px -8px var(--danger-glow);
+}
+
+/* Borda que reage a hover/focus conforme o Design System */
+@utility border-interactive {
+  border-color: var(--border);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+@utility border-interactive:hover {
+  border-color: var(--border-hover);
+}
+@utility border-interactive:focus-visible {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--border-focus) 25%, transparent);
 }
 
 /* ===== Balões flutuantes (Projetos) — infinite-zoom / efeito Droste ===== */
