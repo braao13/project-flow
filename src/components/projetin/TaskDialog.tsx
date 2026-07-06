@@ -41,7 +41,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
     const start = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
     const due = dueDate ? new Date(dueDate).toISOString() : undefined;
     if (task) {
-      updateTask(task.id, { name: name.trim(), description: description.trim() || undefined, projectId, priority, startDate: start, dueDate: due });
+      updateTask(task.id, { name: name.trim(), description: description.trim() || undefined, priority, startDate: start, dueDate: due });
     } else {
       createTask({ name: name.trim(), description: description.trim() || undefined, projectId, priority, startDate: start, dueDate: due });
     }
