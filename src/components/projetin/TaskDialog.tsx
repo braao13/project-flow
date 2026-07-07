@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AssigneeBadge } from "./badges";
 
 interface Props {
   open: boolean;
@@ -16,14 +17,17 @@ interface Props {
   task?: Task;
 }
 
+const UNASSIGNED = "__unassigned__";
+
 export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props) {
-  const { state, createTask, updateTask } = useStore();
+  const { state, currentUserId, createTask, updateTask, setTaskResponsible } = useStore();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState(defaultProjectId ?? state.projects[0]?.id ?? "");
   const [priority, setPriority] = useState<TaskPriority>("nenhuma");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<string>(currentUserId ?? UNASSIGNED);
 
   useEffect(() => {
     if (open) {
@@ -33,17 +37,31 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
       setPriority(task?.priority ?? "nenhuma");
       setStartDate(task?.startDate ? task.startDate.slice(0, 10) : "");
       setDueDate(task?.dueDate ? task.dueDate.slice(0, 10) : "");
+      setResponsibleUserId(task ? (task.responsibleUserId ?? UNASSIGNED) : (currentUserId ?? UNASSIGNED));
     }
-  }, [open, task, defaultProjectId, state.projects]);
+  }, [open, task, defaultProjectId, state.projects, currentUserId]);
 
   const submit = () => {
     if (!name.trim() || !projectId) return;
     const start = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
     const due = dueDate ? new Date(dueDate).toISOString() : undefined;
+    const resolvedResponsible = responsibleUserId === UNASSIGNED ? null : responsibleUserId;
+
     if (task) {
       updateTask(task.id, { name: name.trim(), description: description.trim() || undefined, priority, startDate: start, dueDate: due });
+      if (resolvedResponsible !== (task.responsibleUserId ?? null)) {
+        setTaskResponsible(task.id, resolvedResponsible);
+      }
     } else {
-      createTask({ name: name.trim(), description: description.trim() || undefined, projectId, priority, startDate: start, dueDate: due });
+      createTask({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        projectId,
+        priority,
+        startDate: start,
+        dueDate: due,
+        responsibleUserId: resolvedResponsible,
+      });
     }
     onOpenChange(false);
   };
@@ -86,6 +104,31 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
               </Select>
             </div>
           </div>
+
+          <div className="space-y-1.5">
+            <Label>Responsável</Label>
+            <Select value={responsibleUserId} onValueChange={setResponsibleUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sem responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNASSIGNED}>Sem responsável</SelectItem>
+                {state.profiles.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="inline-flex items-center gap-2">
+                      <AssigneeBadge profile={p} size="xs" />
+                      {p.fullName}
+                      {p.id === currentUserId && <span className="text-muted-foreground">(você)</span>}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Quem for atribuído aqui vê esta task em "Minhas Atribuições" no Dashboard.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Data início</Label>

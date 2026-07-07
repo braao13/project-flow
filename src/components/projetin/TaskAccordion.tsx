@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale";
 import type { Task } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
-import { PriorityBadge, StatusBadge } from "./badges";
+import { AssigneeBadge, PriorityBadge, StatusBadge } from "./badges";
 import { TaskTimeline } from "./TaskTimeline";
 import { TaskComments } from "./TaskComments";
 import { TaskAttachments } from "./TaskAttachments";
@@ -16,12 +16,13 @@ import { Button } from "@/components/ui/button";
 export function TaskAccordion({ task, defaultOpen = false }: { task: Task; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [editing, setEditing] = useState(false);
-  const { deleteTask, toggleTaskDone, getUpdatesByTask, getCommentsByTask, getAttachmentsByTask } = useStore();
+  const { state, deleteTask, toggleTaskDone, getUpdatesByTask, getCommentsByTask, getAttachmentsByTask } = useStore();
 
   const updates = getUpdatesByTask(task.id);
   const doneCount = updates.filter((u) => u.done).length;
   const comments = getCommentsByTask(task.id);
   const attachments = getAttachmentsByTask(task.id);
+  const assignee = state.profiles.find((p) => p.id === task.responsibleUserId);
 
   return (
     <div className="glass rounded-xl overflow-hidden transition-all hover:border-primary/30">
@@ -60,7 +61,8 @@ export function TaskAccordion({ task, defaultOpen = false }: { task: Task; defau
           </div>
         </button>
 
-        <div className="hidden md:flex items-center gap-2 shrink-0">
+        <div className="hidden md:flex items-center gap-3 shrink-0">
+          <AssigneeBadge profile={assignee} />
           <PriorityBadge priority={task.priority} />
           <StatusBadge status={task.status} />
         </div>
@@ -81,6 +83,11 @@ export function TaskAccordion({ task, defaultOpen = false }: { task: Task; defau
       {open && (
         <div className="border-t border-border/60 p-4 space-y-4 bg-background/30">
           {task.description && <p className="text-sm text-muted-foreground">{task.description}</p>}
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground md:hidden">
+            <AssigneeBadge profile={assignee} size="xs" />
+            <span>{assignee ? assignee.fullName : "Sem responsável"}</span>
+          </div>
 
           <Tabs defaultValue="timeline">
             <TabsList className="bg-secondary/40">

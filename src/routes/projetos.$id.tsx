@@ -1,11 +1,15 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useStore } from "@/lib/store";
+import type { TaskPriority } from "@/lib/types";
+import { PRIORITY_META } from "@/lib/types";
 import { TaskAccordion } from "@/components/projetin/TaskAccordion";
 import { TaskDialog } from "@/components/projetin/TaskDialog";
 import { ProjectDialog } from "@/components/projetin/ProjectDialog";
+import { AssigneeBadge } from "@/components/projetin/badges";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/projetos/$id")({
@@ -18,6 +22,8 @@ export const Route = createFileRoute("/projetos/$id")({
   component: ProjectDetail,
 });
 
+const ALL = "todas";
+
 function ProjectDetail() {
   const { id } = Route.useParams();
   const { state, getTasksByProject, deleteProject } = useStore();
@@ -25,19 +31,41 @@ function ProjectDetail() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [filter, setFilter] = useState<"todas" | "andamento" | "finalizada" | "atrasada">("todas");
+
+  // Step 9 — filtros: status (já existia), responsável, prioridade e busca por nome.
+  const [statusFilter, setStatusFilter] = useState<"todas" | "andamento" | "finalizada" | "atrasada">("todas");
+  const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL);
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "todas">("todas");
+  const [search, setSearch] = useState("");
 
   const tasks = useMemo(() => {
     if (!project) return [];
-    const list = getTasksByProject(project.id);
-    const filtered = filter === "todas" ? list : list.filter((t) => t.status === filter);
+    let list = getTasksByProject(project.id);
+
+    if (statusFilter !== "todas") list = list.filter((t) => t.status === statusFilter);
+    if (responsibleFilter !== ALL) list = list.filter((t) => t.responsibleUserId === responsibleFilter);
+    if (priorityFilter !== "todas") list = list.filter((t) => t.priority === priorityFilter);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q));
+    }
+
     const priorityOrder = { maxima: 0, alta: 1, nenhuma: 2, baixa: 3 };
-    return [...filtered].sort((a, b) => {
+    return [...list].sort((a, b) => {
       if (a.status === "finalizada" && b.status !== "finalizada") return 1;
       if (b.status === "finalizada" && a.status !== "finalizada") return -1;
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
-  }, [project, getTasksByProject, filter]);
+  }, [project, getTasksByProject, statusFilter, responsibleFilter, priorityFilter, search]);
+
+  const hasActiveFilters = statusFilter !== "todas" || responsibleFilter !== ALL || priorityFilter !== "todas" || search.trim() !== "";
+
+  const clearFilters = () => {
+    setStatusFilter("todas");
+    setResponsibleFilter(ALL);
+    setPriorityFilter("todas");
+    setSearch("");
+  };
 
   if (!project) {
     return (
@@ -81,17 +109,62 @@ function ProjectDetail() {
         </div>
       </header>
 
-      <div className="flex items-center justify-between gap-3">
-        <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-          <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+      {/* ===== Filtros (Step 9) ===== */}
+      <div className="glass rounded-xl p-3 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome ou descrição..."
+            className="pl-8 h-9"
+          />
+        </div>
+
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+          <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas as tasks</SelectItem>
+            <SelectItem value="todas">Todos os status</SelectItem>
             <SelectItem value="andamento">🟡 Em andamento</SelectItem>
             <SelectItem value="finalizada">🟢 Finalizadas</SelectItem>
             <SelectItem value="atrasada">🔴 Atrasadas</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-sm text-muted-foreground">{tasks.length} task(s)</span>
+
+        <Select value={priorityFilter} onValueChange={(v) => setPriorityFilter(v as typeof priorityFilter)}>
+          <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas as prioridades</SelectItem>
+            {Object.entries(PRIORITY_META).map(([k, m]) => (
+              <SelectItem key={k} value={k}>{m.icon} {m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+          <SelectTrigger className="w-44 h-9">
+            <SelectValue placeholder="Responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os responsáveis</SelectItem>
+            {state.profiles.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                <span className="inline-flex items-center gap-2">
+                  <AssigneeBadge profile={p} size="xs" />
+                  {p.fullName}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
+            <X className="size-3.5 mr-1" /> Limpar
+          </Button>
+        )}
+
+        <span className="text-sm text-muted-foreground ml-auto shrink-0">{tasks.length} task(s)</span>
       </div>
 
       <div className="space-y-3">
