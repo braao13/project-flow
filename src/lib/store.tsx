@@ -29,7 +29,7 @@ function mapProject(row: Tables<"projects">): Project {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
-    color: row.color ?? undefined,
+    
     createdAt: row.created_at,
     ownerId: row.owner_id,
   };
@@ -201,8 +201,8 @@ interface StoreApi {
   loading: boolean;
   currentUserId: string | undefined;
 
-  createProject: (data: { name: string; description?: string; color?: string }) => Promise<Project>;
-  updateProject: (id: string, data: Partial<Pick<Project, "name" | "description" | "color">>) => void;
+  createProject: (data: { name: string; description?: string }) => Promise<Project>;
+  updateProject: (id: string, data: Partial<Pick<Project, "name" | "description">>) => void;
   deleteProject: (id: string) => void;
 
   createTask: (data: {
@@ -281,11 +281,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // ---------- projects ----------
 
   const createProjectMut = useMutation({
-    mutationFn: async (data: { name: string; description?: string; color?: string }) => {
+    mutationFn: async (data: { name: string; description?: string }) => {
       if (!currentUserId) throw new Error("Usuário não autenticado.");
       const { data: row, error } = await supabase
         .from("projects")
-        .insert({ name: data.name, description: data.description, color: data.color, owner_id: currentUserId })
+        .insert({ name: data.name, description: data.description, owner_id: currentUserId })
         .select("*")
         .single();
       if (error) throw error;
@@ -295,7 +295,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
 
   const updateProjectMut = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<Project, "name" | "description" | "color">> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<Project, "name" | "description">> }) => {
       const { error } = await supabase.from("projects").update(data).eq("id", id);
       if (error) throw error;
     },
@@ -354,7 +354,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       id: string;
       data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status">>;
     }) => {
-      const payload: Record<string, unknown> = {};
+      const payload: import("@/lib/supabase/types").TablesUpdate<"tasks"> = {};
       if (data.name !== undefined) payload.title = data.name;
       if (data.description !== undefined) payload.description = data.description;
       if (data.priority !== undefined) payload.priority = data.priority;
@@ -419,7 +419,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateUpdateMut = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Pick<Update, "title" | "description" | "date">> }) => {
-      const payload: Record<string, unknown> = {};
+      const payload: import("@/lib/supabase/types").TablesUpdate<"task_updates"> = {};
       if (data.title !== undefined) payload.title = data.title;
       if (data.description !== undefined) payload.description = data.description;
       if (data.date !== undefined) payload.scheduled_date = data.date;
