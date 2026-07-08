@@ -1,13 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Nomes de variável PRÓPRIOS (não VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY) —
+// de propósito, para não colidir com o que o Lovable Cloud injeta/sobrescreve
+// automaticamente no build enquanto o recurso "Cloud" estiver ativo no projeto.
+const supabaseUrl = import.meta.env.VITE_PROJETIN_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_PROJETIN_SUPABASE_ANON_KEY as string | undefined;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    "VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY não configuradas. Confira o arquivo .env na raiz do projeto " +
-      "ou o painel de Secrets do Lovable.",
+    "VITE_PROJETIN_SUPABASE_URL / VITE_PROJETIN_SUPABASE_ANON_KEY não configuradas. Confira o arquivo .env na " +
+      "raiz do projeto.",
   );
 }
 
