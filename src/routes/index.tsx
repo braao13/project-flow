@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — Projetin" },
+      { title: "Project Flow" },
       { name: "description", content: "Visão geral das suas tasks, entregas e produtividade." },
     ],
   }),
