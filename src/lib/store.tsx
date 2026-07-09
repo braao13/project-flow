@@ -489,8 +489,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addAttachmentMut = useMutation({
     mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
       if (!currentUserId) throw new Error("Usuário não autenticado.");
+
+      // Validação server-side complementar: mesmo com allowlist na bucket do
+      // Supabase Storage (ver migration RLS), rejeitamos aqui para dar feedback
+      // rápido e não confiar no `file.type` fornecido pelo cliente. O MIME é
+      // re-derivado da extensão do arquivo (fonte independente) e cruzado com
+      // uma allowlist estrita antes de enviar.
+      const extToMime: Record<string, string> = {
+        pdf: "application/pdf",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        csv: "text/csv",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        webp: "image/webp",
+        gif: "image/gif",
+      };
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const derivedMime = extToMime[ext];
+      if (!derivedMime) {
+        throw new Error("Tipo de arquivo não permitido.");
+      }
+      if (file.type && file.type !== derivedMime) {
+        // Divergência entre extensão e MIME declarado pelo cliente — rejeita.
+        throw new Error("Tipo de arquivo inconsistente com a extensão.");
+      }
+
       const path = `${taskId}/${crypto.randomUUID()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage.from(ATTACHMENTS_BUCKET).upload(path, file);
+      const { error: uploadError } = await supabase.storage
+        .from(ATTACHMENTS_BUCKET)
+        .upload(path, file, { contentType: derivedMime, upsert: false });
       if (uploadError) throw uploadError;
 
       const { error } = await supabase.from("attachments").insert({
@@ -498,13 +529,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         file_name: file.name,
         file_path: path,
         file_size: file.size,
-        mime_type: file.type,
+        mime_type: derivedMime,
         uploaded_by: currentUserId,
       });
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: KEYS.attachments }),
   });
+
 
   const deleteAttachmentMut = useMutation({
     mutationFn: async (id: string) => {
