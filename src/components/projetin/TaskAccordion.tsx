@@ -5,6 +5,7 @@ import { ptBR } from "date-fns/locale";
 import type { Task } from "@/lib/types";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { STATUS_META } from "@/lib/types";
 import { AssigneeBadge, PriorityBadge, StatusBadge } from "./badges";
 import { TaskTimeline } from "./TaskTimeline";
 import { TaskComments } from "./TaskComments";
@@ -12,6 +13,12 @@ import { TaskAttachments } from "./TaskAttachments";
 import { TaskDialog } from "./TaskDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+
+const STATUS_GLOW_CLASS: Record<Task["status"], string> = {
+  finalizada: "glow-success",
+  andamento: "glow-warning",
+  atrasada: "glow-danger",
+};
 
 export function TaskAccordion({ task, defaultOpen = false }: { task: Task; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -24,8 +31,13 @@ export function TaskAccordion({ task, defaultOpen = false }: { task: Task; defau
   const attachments = getAttachmentsByTask(task.id);
   const assignee = state.profiles.find((p) => p.id === task.responsibleUserId);
 
+  const statusColor = STATUS_META[task.status].color;
+
   return (
-    <div className="glass rounded-xl overflow-hidden transition-all hover:border-primary/30">
+    <div
+      className={cn("glass rounded-xl overflow-hidden transition-all border", STATUS_GLOW_CLASS[task.status])}
+      style={{ borderColor: `color-mix(in oklab, ${statusColor} 45%, transparent)` }}
+    >
       <div className="flex items-center gap-3 p-4">
         <button
           onClick={() => toggleTaskDone(task.id)}
