@@ -1,5 +1,6 @@
 import { FileText, Image as ImageIcon, Paperclip, Trash2, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 
@@ -14,18 +15,53 @@ function iconFor(type: string) {
   return FileText;
 }
 
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB por arquivo
+
 export function TaskAttachments({ taskId }: { taskId: string }) {
   const { getAttachmentsByTask, addAttachment, deleteAttachment, getAttachmentUrl } = useStore();
   const files = getAttachmentsByTask(taskId);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const openFile = async (path: string, name: string) => {
-    const url = await getAttachmentUrl(path);
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
+    try {
+      const url = await getAttachmentUrl(path);
+      if (!url) throw new Error("URL não gerada");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+    } catch {
+      toast.error(`Não foi possível abrir "${name}".`);
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      await deleteAttachment(id);
+    } catch {
+      toast.error(`Não foi possível excluir "${name}".`);
+    }
+  };
+
+  const handleUpload = async (list: FileList) => {
+    setUploading(true);
+    let failed = 0;
+    for (const f of Array.from(list)) {
+      if (f.size > MAX_FILE_SIZE) {
+        toast.error(`"${f.name}" excede o limite de 20 MB.`);
+        failed++;
+        continue;
+      }
+      try {
+        await addAttachment(taskId, f);
+      } catch {
+        toast.error(`Falha ao enviar "${f.name}".`);
+        failed++;
+      }
+    }
+    setUploading(false);
+    if (failed === 0) toast.success("Anexo enviado.");
   };
 
   return (
@@ -40,7 +76,7 @@ export function TaskAttachments({ taskId }: { taskId: string }) {
                 {f.name}
               </button>
               <span className="text-xs text-muted-foreground">{humanSize(f.size)}</span>
-              <button onClick={() => deleteAttachment(f.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+              <button onClick={() => handleDelete(f.id, f.name)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
                 <Trash2 className="size-3.5" />
               </button>
             </li>
@@ -60,16 +96,16 @@ export function TaskAttachments({ taskId }: { taskId: string }) {
         multiple
         onChange={async (e) => {
           const list = e.target.files;
-          if (!list) return;
-          for (const f of Array.from(list)) await addAttachment(taskId, f);
+          if (!list || list.length === 0) return;
+          await handleUpload(list);
           if (inputRef.current) inputRef.current.value = "";
         }}
       />
-      <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
-        <Upload className="size-3.5 mr-1.5" /> Anexar arquivo
+      <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={uploading}>
+        <Upload className="size-3.5 mr-1.5" /> {uploading ? "Enviando..." : "Anexar arquivo"}
       </Button>
       <p className="text-[11px] text-muted-foreground">
-        Armazenamento local. Pronto para integração futura com Supabase Storage.
+        Arquivos enviados para o Supabase Storage, vinculados a esta task. Limite de 20 MB por arquivo.
       </p>
     </div>
   );
