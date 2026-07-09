@@ -53,6 +53,8 @@ export interface Task {
   createdAt: string;
   createdBy: string; // Step 6 — quem criou a task
   responsibleUserId?: string | null; // Step 6 — responsável atual (pode ser reatribuído)
+  /** Task anterior na sequência (cadeia simples A → B → C). Null = início de cadeia ou task isolada. */
+  previousTaskId?: string | null;
 }
 
 export interface Project {
@@ -90,4 +92,53 @@ export function isOverdue(task: Pick<Task, "status" | "dueDate">): boolean {
 export function effectiveStatus(task: Pick<Task, "status" | "dueDate">): TaskStatus {
   if (task.status === "finalizada") return "finalizada";
   return isOverdue(task) ? "atrasada" : "andamento";
+}
+
+/**
+ * Ordena tasks respeitando a cadeia sequencial (previousTaskId).
+ * Cada cadeia é colocada em sequência (início → fim); tasks sem vínculo
+ * ficam ao final, na ordem original. Retorna também, para cada task, se ela
+ * está diretamente conectada à PRÓXIMA task do array resultante — usado para
+ * desenhar a seta de conexão entre balões.
+ */
+export function orderTasksByChain<T extends Pick<Task, "id" | "previousTaskId">>(
+  tasks: T[],
+): { task: T; connectedToNext: boolean }[] {
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const nextOf = new Map<string, T>(); // previousTaskId -> task que o segue
+  for (const t of tasks) {
+    if (t.previousTaskId && byId.has(t.previousTaskId)) {
+      nextOf.set(t.previousTaskId, t);
+    }
+  }
+
+  const visited = new Set<string>();
+  const ordered: T[] = [];
+
+  // Início de cadeia = task sem previousTaskId válido, mas que é predecessora de alguma outra,
+  // OU task isolada (sem previousTaskId e sem sucessora) — tratada depois.
+  const heads = tasks.filter((t) => (!t.previousTaskId || !byId.has(t.previousTaskId)) && nextOf.has(t.id));
+
+  for (const head of heads) {
+    let cur: T | undefined = head;
+    while (cur && !visited.has(cur.id)) {
+      visited.add(cur.id);
+      ordered.push(cur);
+      cur = nextOf.get(cur.id);
+    }
+  }
+
+  // Tasks isoladas (sem cadeia nenhuma) na ordem original, ao final.
+  for (const t of tasks) {
+    if (!visited.has(t.id)) {
+      visited.add(t.id);
+      ordered.push(t);
+    }
+  }
+
+  return ordered.map((task, i) => {
+    const next = ordered[i + 1];
+    const connectedToNext = !!next && next.previousTaskId === task.id;
+    return { task, connectedToNext };
+  });
 }
