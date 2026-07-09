@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -112,6 +110,7 @@ export type Database = {
           first_login_completed: boolean
           full_name: string
           id: string
+          role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           username: string
         }
@@ -122,6 +121,7 @@ export type Database = {
           first_login_completed?: boolean
           full_name: string
           id: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           username: string
         }
@@ -132,6 +132,7 @@ export type Database = {
           first_login_completed?: boolean
           full_name?: string
           id?: string
+          role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           username?: string
         }
@@ -323,6 +324,7 @@ export type Database = {
     Enums: {
       task_priority: "maxima" | "alta" | "nenhuma" | "baixa"
       task_status: "andamento" | "atrasada" | "finalizada"
+      user_role: "administrador" | "gestor" | "colaborador"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -452,6 +454,7 @@ export const Constants = {
     Enums: {
       task_priority: ["maxima", "alta", "nenhuma", "baixa"],
       task_status: ["andamento", "atrasada", "finalizada"],
+      user_role: ["administrador", "gestor", "colaborador"],
     },
   },
 } as const
