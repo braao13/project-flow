@@ -176,6 +176,42 @@ export type Database = {
           },
         ]
       }
+      task_assignees: {
+        Row: {
+          assigned_at: string
+          is_primary: boolean
+          profile_id: string
+          task_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          is_primary?: boolean
+          profile_id: string
+          task_id: string
+        }
+        Update: {
+          assigned_at?: string
+          is_primary?: boolean
+          profile_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_updates: {
         Row: {
           completed: boolean
@@ -247,7 +283,7 @@ export type Database = {
           previous_task_id: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project_id: string
-          responsible_user_id: string | null
+          responsible_user_id: string
           start_date: string | null
           status: Database["public"]["Enums"]["task_status"]
           title: string
@@ -262,7 +298,7 @@ export type Database = {
           previous_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id: string
-          responsible_user_id?: string | null
+          responsible_user_id: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title: string
@@ -277,7 +313,7 @@ export type Database = {
           previous_task_id?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project_id?: string
-          responsible_user_id?: string | null
+          responsible_user_id?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["task_status"]
           title?: string
