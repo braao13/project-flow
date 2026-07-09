@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Plus, X } from "lucide-react";
+import { ArrowRight, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface BalloonItem {
@@ -9,6 +9,8 @@ export interface BalloonItem {
   borderColor: string;
   sizeScale?: number;
   dots?: { color: string }[];
+  /** Se true, desenha uma seta de sequência ligando este balão ao PRÓXIMO item do array. */
+  connectedToNext?: boolean;
 }
 
 interface BalloonFieldProps {
@@ -46,7 +48,15 @@ export function BalloonField({ items, emptyLabel, renderExpanded, onAdd, addLabe
         {items.length === 0 && !onAdd && <p className="text-sm text-muted-foreground italic px-2">{emptyLabel}</p>}
 
         {items.map((item, i) => (
-          <Balloon key={item.id} item={item} index={i} dimmed={!!expanded} onClick={() => setExpandedId(item.id)} />
+          <div key={item.id} className="flex items-center gap-3 shrink-0">
+            <Balloon item={item} index={i} dimmed={!!expanded} onClick={() => setExpandedId(item.id)} />
+            {item.connectedToNext && (
+              <ArrowRight
+                className={cn("size-5 text-primary shrink-0 transition-opacity", expanded && "opacity-30")}
+                aria-hidden
+              />
+            )}
+          </div>
         ))}
 
         {onAdd && (
@@ -74,7 +84,7 @@ export function BalloonField({ items, emptyLabel, renderExpanded, onAdd, addLabe
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-balloon-scrim-in" />
 
           <div
-            className="relative w-full max-w-3xl max-h-[85vh] overflow-auto glass-strong rounded-[2.5rem] p-8 animate-balloon-zoom-in"
+            className="relative w-full max-w-5xl h-[90vh] overflow-auto glass-strong rounded-[2.5rem] p-10 animate-balloon-zoom-in"
             style={{ borderWidth: 3, borderColor: expanded.borderColor, boxShadow: `0 0 60px -10px ${expanded.borderColor}` }}
           >
             <span className="balloon-ripple" style={{ borderColor: expanded.borderColor }} />
