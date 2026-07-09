@@ -40,8 +40,7 @@ export function BalloonField({ items, emptyLabel, renderExpanded, onAdd, addLabe
     <div className="relative">
       <div
         className={cn(
-          "flex items-center gap-6 overflow-x-auto py-6 px-1 transition-opacity duration-300",
-          "[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full",
+          "flex flex-wrap items-center gap-6 py-6 px-1 transition-opacity duration-300",
           expanded && "pointer-events-none",
         )}
       >
@@ -84,7 +83,7 @@ export function BalloonField({ items, emptyLabel, renderExpanded, onAdd, addLabe
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md animate-balloon-scrim-in" />
 
           <div
-            className="relative w-full max-w-5xl h-[90vh] overflow-auto glass-strong rounded-[2.5rem] p-10 animate-balloon-zoom-in"
+            className="relative w-full max-w-5xl max-h-[90vh] overflow-auto glass-strong rounded-[2.5rem] p-10 animate-balloon-zoom-in [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
             style={{ borderWidth: 3, borderColor: expanded.borderColor, boxShadow: `0 0 60px -10px ${expanded.borderColor}` }}
           >
             <span className="balloon-ripple" style={{ borderColor: expanded.borderColor }} />
