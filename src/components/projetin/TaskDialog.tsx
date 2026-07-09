@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { PRIORITY_META } from "@/lib/types";
@@ -18,6 +18,7 @@ interface Props {
 }
 
 const UNASSIGNED = "__unassigned__";
+const NONE = "__none__";
 
 export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props) {
   const { state, currentUserId, createTask, updateTask, setTaskResponsible } = useStore();
@@ -28,6 +29,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [responsibleUserId, setResponsibleUserId] = useState<string>(currentUserId ?? UNASSIGNED);
+  const [previousTaskId, setPreviousTaskId] = useState<string>(NONE);
 
   useEffect(() => {
     if (open) {
@@ -38,17 +40,54 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
       setStartDate(task?.startDate ? task.startDate.slice(0, 10) : "");
       setDueDate(task?.dueDate ? task.dueDate.slice(0, 10) : "");
       setResponsibleUserId(task ? (task.responsibleUserId ?? UNASSIGNED) : (currentUserId ?? UNASSIGNED));
+      setPreviousTaskId(task?.previousTaskId ?? NONE);
     }
   }, [open, task, defaultProjectId, state.projects, currentUserId]);
+
+  // Tasks do mesmo projeto elegíveis como "task anterior": exclui a própria task,
+  // exclui descendentes (evita ciclo na cadeia) e exclui tasks que já têm outra
+  // sucessora (cadeia simples = no máximo 1 sucessora por task).
+  const availablePredecessors = useMemo(() => {
+    if (!projectId) return [];
+    const projectTasks = state.tasks.filter((t) => t.projectId === projectId);
+
+    const descendants = new Set<string>();
+    if (task) {
+      const nextOf = new Map(projectTasks.filter((t) => t.previousTaskId).map((t) => [t.previousTaskId as string, t]));
+      let cur = nextOf.get(task.id);
+      while (cur && !descendants.has(cur.id)) {
+        descendants.add(cur.id);
+        cur = nextOf.get(cur.id);
+      }
+    }
+
+    const successorOf = new Map(projectTasks.filter((t) => t.previousTaskId).map((t) => [t.previousTaskId as string, t.id]));
+
+    return projectTasks.filter((t) => {
+      if (task && t.id === task.id) return false;
+      if (descendants.has(t.id)) return false;
+      const successorId = successorOf.get(t.id);
+      if (successorId && successorId !== task?.id) return false;
+      return true;
+    });
+  }, [state.tasks, projectId, task]);
 
   const submit = () => {
     if (!name.trim() || !projectId) return;
     const start = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
     const due = dueDate ? new Date(dueDate).toISOString() : undefined;
     const resolvedResponsible = responsibleUserId === UNASSIGNED ? null : responsibleUserId;
+    const resolvedPrevious = previousTaskId === NONE ? null : previousTaskId;
 
     if (task) {
-      updateTask(task.id, { name: name.trim(), description: description.trim() || undefined, priority, startDate: start, dueDate: due });
+      updateTask(task.id, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        priority,
+        startDate: start,
+        dueDate: due,
+        previousTaskId: resolvedPrevious,
+      });
       if (resolvedResponsible !== (task.responsibleUserId ?? null)) {
         setTaskResponsible(task.id, resolvedResponsible);
       }
@@ -61,6 +100,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
         startDate: start,
         dueDate: due,
         responsibleUserId: resolvedResponsible,
+        previousTaskId: resolvedPrevious,
       });
     }
     onOpenChange(false);
@@ -126,6 +166,24 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
             </Select>
             <p className="text-[11px] text-muted-foreground">
               Quem for atribuído aqui vê esta task em "Minhas Atribuições" no Dashboard.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Vem depois de</Label>
+            <Select value={previousTaskId} onValueChange={setPreviousTaskId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Nenhuma (início de cadeia)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Nenhuma (início de cadeia)</SelectItem>
+                {availablePredecessors.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground">
+              Define a sequência exibida como seta entre os balões do projeto.
             </p>
           </div>
 
