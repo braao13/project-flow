@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
+import type { Task } from "@/lib/types";
 import { MonthCalendar, type CalendarDayItem } from "@/components/projetin/MonthCalendar";
+import { TaskDialog } from "@/components/projetin/TaskDialog";
 
 export const Route = createFileRoute("/calendario")({
   head: () => ({
@@ -15,26 +17,41 @@ export const Route = createFileRoute("/calendario")({
 
 function CalendarioPage() {
   const { state } = useStore();
+  const [editingTask, setEditingTask] = useState<Task | undefined>();
 
   const items = useMemo<CalendarDayItem[]>(() => {
     const list: CalendarDayItem[] = [];
     state.tasks.forEach((t) => {
-      if (t.dueDate) {
-        list.push({
-          type: "entrega",
-          label: t.name,
-          taskId: t.id,
-          projectId: t.projectId,
-          date: t.dueDate.slice(0, 10),
-          done: t.status === "finalizada",
-        });
-      }
+      if (!t.dueDate) return;
+      const project = state.projects.find((p) => p.id === t.projectId);
+      list.push({
+        type: "entrega",
+        label: t.name,
+        taskId: t.id,
+        projectId: t.projectId,
+        projectName: project?.name ?? "Sem projeto",
+        projectColor: project?.color ?? undefined,
+        status: t.status,
+        date: t.dueDate.slice(0, 10),
+        done: t.status === "finalizada",
+        onOpenTask: () => setEditingTask(t),
+      });
     });
     state.updates.forEach((u) => {
       if (!u.date) return;
       const task = state.tasks.find((t) => t.id === u.taskId);
       if (!task) return;
-      list.push({ type: "atualizacao", label: u.title, taskId: u.taskId, projectId: task.projectId, date: u.date, done: u.done });
+      const project = state.projects.find((p) => p.id === task.projectId);
+      list.push({
+        type: "atualizacao",
+        label: u.title,
+        taskId: u.taskId,
+        projectId: task.projectId,
+        projectName: project?.name ?? "Sem projeto",
+        date: u.date,
+        done: u.done,
+        onOpenTask: () => setEditingTask(task),
+      });
     });
     return list;
   }, [state]);
@@ -47,6 +64,8 @@ function CalendarioPage() {
       </header>
 
       <MonthCalendar items={items} />
+
+      <TaskDialog open={!!editingTask} onOpenChange={(o) => !o && setEditingTask(undefined)} task={editingTask} />
     </div>
   );
 }
