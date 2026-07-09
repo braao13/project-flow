@@ -1,14 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { format, isToday, parseISO, startOfWeek, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, CheckCircle2, Clock, ListTodo, TrendingUp } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { STATUS_META, type Task } from "@/lib/types";
-import { PriorityBadge, StatusBadge } from "@/components/projetin/badges";
+import { AssigneeBadge, PriorityBadge, StatusBadge } from "@/components/projetin/badges";
 import { MonthCalendar, type CalendarDayItem } from "@/components/projetin/MonthCalendar";
+import { TaskDialog } from "@/components/projetin/TaskDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -62,10 +64,23 @@ function StatsRow({ counts }: { counts: ReturnType<typeof taskCounts> }) {
   );
 }
 
-function UpcomingList({ tasks, projects, emptyLabel }: { tasks: Task[]; projects: { id: string; name: string }[]; emptyLabel: string }) {
+function UpcomingList({
+  tasks,
+  projects,
+  emptyLabel,
+  filterControl,
+}: {
+  tasks: Task[];
+  projects: { id: string; name: string }[];
+  emptyLabel: string;
+  filterControl?: ReactNode;
+}) {
   return (
     <section className="glass rounded-2xl p-5">
-      <h2 className="font-semibold mb-4">Próximas entregas</h2>
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h2 className="font-semibold">Próximas entregas</h2>
+        {filterControl}
+      </div>
       {tasks.length === 0 ? (
         <p className="text-sm text-muted-foreground">{emptyLabel}</p>
       ) : (
@@ -93,13 +108,23 @@ function UpcomingList({ tasks, projects, emptyLabel }: { tasks: Task[]; projects
   );
 }
 
+const ALL_RESPONSIBLE = "todos";
+
 function Dashboard() {
   const { state, currentUserId } = useStore();
   const tasks = state.tasks;
+  const [editingTask, setEditingTask] = useState<Task | undefined>();
 
   // ---------- Panorama Geral (todo o workspace) ----------
   const counts = useMemo(() => taskCounts(tasks), [tasks]);
   const upcoming = useMemo(() => upcomingOf(tasks), [tasks]);
+
+  // Filtro por responsável — aplicado na listagem de "Próximas entregas" do Panorama Geral.
+  const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL_RESPONSIBLE);
+  const filteredUpcoming = useMemo(
+    () => (responsibleFilter === ALL_RESPONSIBLE ? upcoming : upcoming.filter((t) => t.responsibleUserId === responsibleFilter)),
+    [upcoming, responsibleFilter],
+  );
 
   const pieData = useMemo(
     () =>
@@ -124,18 +149,39 @@ function Dashboard() {
   const generalCalendarItems = useMemo<CalendarDayItem[]>(() => {
     const list: CalendarDayItem[] = [];
     tasks.forEach((t) => {
-      if (t.dueDate) {
-        list.push({ type: "entrega", label: t.name, taskId: t.id, projectId: t.projectId, date: t.dueDate.slice(0, 10), done: t.status === "finalizada" });
-      }
+      if (!t.dueDate) return;
+      const project = state.projects.find((p) => p.id === t.projectId);
+      list.push({
+        type: "entrega",
+        label: t.name,
+        taskId: t.id,
+        projectId: t.projectId,
+        projectName: project?.name ?? "Sem projeto",
+        projectColor: project?.color ?? undefined,
+        status: t.status,
+        date: t.dueDate.slice(0, 10),
+        done: t.status === "finalizada",
+        onOpenTask: () => setEditingTask(t),
+      });
     });
     state.updates.forEach((u) => {
       if (!u.date) return;
       const task = tasks.find((t) => t.id === u.taskId);
       if (!task) return;
-      list.push({ type: "atualizacao", label: u.title, taskId: u.taskId, projectId: task.projectId, date: u.date, done: u.done });
+      const project = state.projects.find((p) => p.id === task.projectId);
+      list.push({
+        type: "atualizacao",
+        label: u.title,
+        taskId: u.taskId,
+        projectId: task.projectId,
+        projectName: project?.name ?? "Sem projeto",
+        date: u.date,
+        done: u.done,
+        onOpenTask: () => setEditingTask(task),
+      });
     });
     return list;
-  }, [tasks, state.updates]);
+  }, [tasks, state.updates, state.projects]);
 
   // ---------- Minhas Atribuições (só o usuário logado) ----------
   // Filtragem automática pelo usuário autenticado — nunca exibe tasks de outros.
@@ -158,15 +204,22 @@ function Dashboard() {
   const myCalendarItems = useMemo<CalendarDayItem[]>(() => {
     return myTasks
       .filter((t) => t.dueDate)
-      .map((t) => ({
-        type: "entrega" as const,
-        label: t.name,
-        taskId: t.id,
-        projectId: t.projectId,
-        date: t.dueDate!.slice(0, 10),
-        done: t.status === "finalizada",
-      }));
-  }, [myTasks]);
+      .map((t) => {
+        const project = state.projects.find((p) => p.id === t.projectId);
+        return {
+          type: "entrega" as const,
+          label: t.name,
+          taskId: t.id,
+          projectId: t.projectId,
+          projectName: project?.name ?? "Sem projeto",
+          projectColor: project?.color ?? undefined,
+          status: t.status,
+          date: t.dueDate!.slice(0, 10),
+          done: t.status === "finalizada",
+          onOpenTask: () => setEditingTask(t),
+        };
+      });
+  }, [myTasks, state.projects]);
 
   return (
     <div className="space-y-6">
@@ -240,7 +293,29 @@ function Dashboard() {
             </div>
           </section>
 
-          <UpcomingList tasks={upcoming} projects={state.projects} emptyLabel="Nenhuma entrega agendada." />
+          <UpcomingList
+            tasks={filteredUpcoming}
+            projects={state.projects}
+            emptyLabel="Nenhuma entrega agendada."
+            filterControl={
+              <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
+                <SelectTrigger className="w-44 h-8 text-xs">
+                  <SelectValue placeholder="Responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_RESPONSIBLE}>Todos os responsáveis</SelectItem>
+                  {state.profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <AssigneeBadge profile={p} size="xs" />
+                        {p.fullName}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            }
+          />
 
           <section>
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-3">Calendário geral</h2>
@@ -288,6 +363,8 @@ function Dashboard() {
           </section>
         </TabsContent>
       </Tabs>
+
+      <TaskDialog open={!!editingTask} onOpenChange={(o) => !o && setEditingTask(undefined)} task={editingTask} />
     </div>
   );
 }
