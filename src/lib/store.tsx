@@ -213,7 +213,7 @@ interface StoreApi {
     priority?: TaskPriority;
     startDate: string;
     dueDate?: string;
-    responsibleUserId?: string | null;
+    responsibleUserId: string;
     previousTaskId?: string | null;
   }) => Promise<Task>;
   updateTask: (
@@ -223,8 +223,8 @@ interface StoreApi {
   deleteTask: (id: string) => void;
   toggleTaskDone: (id: string) => void;
   setTaskPriority: (id: string, p: TaskPriority) => void;
-  /** Step 6 — reatribuir o responsável de uma task. */
-  setTaskResponsible: (id: string, responsibleUserId: string | null) => void;
+  /** Step 6 — reatribuir o responsável de uma task. Toda task deve ter um responsável. */
+  setTaskResponsible: (id: string, responsibleUserId: string) => void;
 
   createUpdate: (data: {
     taskId: string;
@@ -325,7 +325,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       priority?: TaskPriority;
       startDate: string;
       dueDate?: string;
-      responsibleUserId?: string | null;
+      responsibleUserId: string;
       previousTaskId?: string | null;
     }) => {
       if (!currentUserId) throw new Error("Usuário não autenticado.");
@@ -339,7 +339,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           start_date: data.startDate,
           due_date: data.dueDate,
           created_by: currentUserId,
-          responsible_user_id: data.responsibleUserId ?? currentUserId,
+          responsible_user_id: data.responsibleUserId,
           previous_task_id: data.previousTaskId ?? null,
         })
         .select("*")
@@ -386,7 +386,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
 
   const setTaskResponsibleMut = useMutation({
-    mutationFn: async ({ id, responsibleUserId }: { id: string; responsibleUserId: string | null }) => {
+    mutationFn: async ({ id, responsibleUserId }: { id: string; responsibleUserId: string }) => {
       const { error } = await supabase.from("tasks").update({ responsible_user_id: responsibleUserId }).eq("id", id);
       if (error) throw error;
     },
