@@ -84,7 +84,7 @@ function mapAttachment(row: Tables<"attachments">): Attachment {
 }
 
 function mapProfile(row: Tables<"profiles">): Profile {
-  return { id: row.id, username: row.username, fullName: row.full_name, email: row.email, avatarUrl: row.avatar_url };
+  return { id: row.id, username: row.username, fullName: row.full_name, email: row.email, avatarUrl: row.avatar_url, role: row.role };
 }
 
 // ---------- queries ----------
