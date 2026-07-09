@@ -1,7 +1,8 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { CalendarDays, LayoutDashboard, FolderKanban, Sun, Sparkles, PanelLeft, X } from "lucide-react";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { CalendarDays, LayoutDashboard, FolderKanban, Sun, Sparkles, PanelLeft, X, LogOut } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth/AuthProvider";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -13,6 +14,13 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: "/login" });
+  };
 
   // navegar fecha a barra — evita ficar aberta sobre a página seguinte.
   useEffect(() => setOpen(false), [pathname]);
@@ -90,9 +98,33 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
         </nav>
 
-        <div className="mt-auto p-3 rounded-xl glass text-xs text-muted-foreground">
-          <div className="font-medium text-foreground mb-1">Próximas fases</div>
-          Integração Telegram e IA de produtividade já previstas na arquitetura.
+        <div className="mt-auto flex flex-col gap-2">
+          {profile && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl glass">
+              <div
+                className="size-8 rounded-full grid place-items-center shrink-0 text-xs font-semibold text-primary-foreground"
+                style={{ background: "var(--gradient-primary)" }}
+              >
+                {profile.fullName.slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium truncate">{profile.fullName}</div>
+                <div className="text-[11px] text-muted-foreground truncate">@{profile.username}</div>
+              </div>
+              <button
+                onClick={handleSignOut}
+                aria-label="Sair"
+                title="Sair"
+                className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary shrink-0"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          )}
+          <div className="p-3 rounded-xl glass text-xs text-muted-foreground">
+            <div className="font-medium text-foreground mb-1">Próximas fases</div>
+            Integração Telegram e IA de produtividade já previstas na arquitetura.
+          </div>
         </div>
       </aside>
 
