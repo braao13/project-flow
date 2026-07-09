@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { useStore } from "@/lib/store";
 import type { Task, TaskPriority } from "@/lib/types";
 import { PRIORITY_META } from "@/lib/types";
@@ -17,7 +18,6 @@ interface Props {
   task?: Task;
 }
 
-const UNASSIGNED = "__unassigned__";
 const NONE = "__none__";
 
 export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props) {
@@ -28,7 +28,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
   const [priority, setPriority] = useState<TaskPriority>("nenhuma");
   const [startDate, setStartDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [responsibleUserId, setResponsibleUserId] = useState<string>(currentUserId ?? UNASSIGNED);
+  const [responsibleUserId, setResponsibleUserId] = useState<string>(currentUserId ?? "");
   const [previousTaskId, setPreviousTaskId] = useState<string>(NONE);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
       setPriority(task?.priority ?? "nenhuma");
       setStartDate(task?.startDate ? task.startDate.slice(0, 10) : "");
       setDueDate(task?.dueDate ? task.dueDate.slice(0, 10) : "");
-      setResponsibleUserId(task ? (task.responsibleUserId ?? UNASSIGNED) : (currentUserId ?? UNASSIGNED));
+      setResponsibleUserId(task ? task.responsibleUserId : (currentUserId ?? ""));
       setPreviousTaskId(task?.previousTaskId ?? NONE);
     }
   }, [open, task, defaultProjectId, state.projects, currentUserId]);
@@ -74,9 +74,12 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
 
   const submit = () => {
     if (!name.trim() || !projectId) return;
+    if (!responsibleUserId) {
+      toast.error("Selecione um responsável — toda task precisa de um.");
+      return;
+    }
     const start = startDate ? new Date(startDate).toISOString() : new Date().toISOString();
     const due = dueDate ? new Date(dueDate).toISOString() : undefined;
-    const resolvedResponsible = responsibleUserId === UNASSIGNED ? null : responsibleUserId;
     const resolvedPrevious = previousTaskId === NONE ? null : previousTaskId;
 
     if (task) {
@@ -88,8 +91,8 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
         dueDate: due,
         previousTaskId: resolvedPrevious,
       });
-      if (resolvedResponsible !== (task.responsibleUserId ?? null)) {
-        setTaskResponsible(task.id, resolvedResponsible);
+      if (responsibleUserId !== task.responsibleUserId) {
+        setTaskResponsible(task.id, responsibleUserId);
       }
     } else {
       createTask({
@@ -99,7 +102,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
         priority,
         startDate: start,
         dueDate: due,
-        responsibleUserId: resolvedResponsible,
+        responsibleUserId,
         previousTaskId: resolvedPrevious,
       });
     }
@@ -146,13 +149,12 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
           </div>
 
           <div className="space-y-1.5">
-            <Label>Responsável</Label>
+            <Label>Responsável *</Label>
             <Select value={responsibleUserId} onValueChange={setResponsibleUserId}>
               <SelectTrigger>
-                <SelectValue placeholder="Sem responsável" />
+                <SelectValue placeholder="Selecione um responsável" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UNASSIGNED}>Sem responsável</SelectItem>
                 {state.profiles.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     <span className="inline-flex items-center gap-2">
@@ -165,7 +167,7 @@ export function TaskDialog({ open, onOpenChange, defaultProjectId, task }: Props
               </SelectContent>
             </Select>
             <p className="text-[11px] text-muted-foreground">
-              Quem for atribuído aqui vê esta task em "Minhas Atribuições" no Dashboard.
+              Obrigatório. Quem for atribuído aqui vê esta task em "Minhas Atribuições" no Dashboard.
             </p>
           </div>
 
