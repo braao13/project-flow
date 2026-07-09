@@ -54,8 +54,9 @@ export interface Task {
   startDate: string; // ISO
   dueDate?: string; // ISO ou undefined
   createdAt: string;
-  createdBy: string; // Step 6 — quem criou a task
-  responsibleUserId?: string | null; // Step 6 — responsável atual (pode ser reatribuído)
+  createdBy: string; // Step 6 — quem criou a task (auditoria)
+  /** Responsável pela task. Toda task deve ter um — obrigatório, nunca null. */
+  responsibleUserId: string;
   /** Task anterior na sequência (cadeia simples A → B → C). Null = início de cadeia ou task isolada. */
   previousTaskId?: string | null;
 }
