@@ -105,10 +105,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="size-8 rounded-full grid place-items-center shrink-0 text-xs font-semibold text-primary-foreground"
                 style={{ background: "var(--gradient-primary)" }}
               >
-                {profile.fullName.slice(0, 2).toUpperCase()}
+                {profile.full_name.slice(0, 2).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium truncate">{profile.fullName}</div>
+                <div className="text-sm font-medium truncate">{profile.full_name}</div>
+
                 <div className="text-[11px] text-muted-foreground truncate">@{profile.username}</div>
               </div>
               <button
