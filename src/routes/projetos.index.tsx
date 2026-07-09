@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { STATUS_META } from "@/lib/types";
+import { STATUS_META, orderTasksByChain } from "@/lib/types";
 import type { Project, Task, TaskStatus } from "@/lib/types";
 import { ProjectDialog } from "@/components/projetin/ProjectDialog";
 import { TaskDialog } from "@/components/projetin/TaskDialog";
@@ -69,7 +69,8 @@ function ProjectsList() {
           if (!project) return null;
           const tasks = state.tasks.filter((t) => t.projectId === project.id);
 
-          const taskItems: BalloonItem[] = tasks.map((t) => {
+          const chained = orderTasksByChain(tasks);
+          const taskItems: BalloonItem[] = chained.map(({ task: t, connectedToNext }) => {
             const updates = state.updates.filter((u) => u.taskId === t.id);
             return {
               id: t.id,
@@ -77,6 +78,7 @@ function ProjectsList() {
               subtitle: STATUS_META[t.status].label,
               borderColor: STATUS_META[t.status].color,
               dots: updates.slice(0, 8).map((u) => ({ color: u.done ? "var(--success)" : "var(--muted-foreground)" })),
+              connectedToNext,
             };
           });
 
