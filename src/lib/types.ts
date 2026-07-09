@@ -1,5 +1,7 @@
 export type TaskStatus = "andamento" | "finalizada" | "atrasada";
 export type TaskPriority = "maxima" | "alta" | "nenhuma" | "baixa";
+/** Reservado para níveis de permissão futuros. Nenhuma regra de acesso depende disso ainda. */
+export type UserRole = "administrador" | "gestor" | "colaborador";
 
 export interface Profile {
   id: string;
@@ -7,6 +9,7 @@ export interface Profile {
   fullName: string;
   email: string;
   avatarUrl?: string | null;
+  role: UserRole;
 }
 
 export interface Update {
