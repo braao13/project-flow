@@ -37,6 +37,8 @@ function ProjectDetail() {
   const [responsibleFilter, setResponsibleFilter] = useState<string>(ALL);
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | "todas">("todas");
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const tasks = useMemo(() => {
     if (!project) return [];
@@ -49,6 +51,8 @@ function ProjectDetail() {
       const q = search.trim().toLowerCase();
       list = list.filter((t) => t.name.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q));
     }
+    if (dateFrom) list = list.filter((t) => t.dueDate && t.dueDate >= dateFrom);
+    if (dateTo) list = list.filter((t) => t.dueDate && t.dueDate <= dateTo);
 
     const priorityOrder = { maxima: 0, alta: 1, nenhuma: 2, baixa: 3 };
     return [...list].sort((a, b) => {
@@ -56,15 +60,23 @@ function ProjectDetail() {
       if (b.status === "finalizada" && a.status !== "finalizada") return -1;
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
-  }, [project, getTasksByProject, statusFilter, responsibleFilter, priorityFilter, search]);
+  }, [project, getTasksByProject, statusFilter, responsibleFilter, priorityFilter, search, dateFrom, dateTo]);
 
-  const hasActiveFilters = statusFilter !== "todas" || responsibleFilter !== ALL || priorityFilter !== "todas" || search.trim() !== "";
+  const hasActiveFilters =
+    statusFilter !== "todas" ||
+    responsibleFilter !== ALL ||
+    priorityFilter !== "todas" ||
+    search.trim() !== "" ||
+    dateFrom !== "" ||
+    dateTo !== "";
 
   const clearFilters = () => {
     setStatusFilter("todas");
     setResponsibleFilter(ALL);
     setPriorityFilter("todas");
     setSearch("");
+    setDateFrom("");
+    setDateTo("");
   };
 
   if (!project) {
@@ -157,6 +169,24 @@ function ProjectDetail() {
             ))}
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-1.5">
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="w-[150px] h-9"
+            title="Entrega a partir de"
+          />
+          <span className="text-xs text-muted-foreground">até</span>
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="w-[150px] h-9"
+            title="Entrega até"
+          />
+        </div>
 
         {hasActiveFilters && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9">
