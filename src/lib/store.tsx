@@ -48,6 +48,7 @@ function mapTask(row: Tables<"tasks">): Task {
     createdAt: row.created_at,
     createdBy: row.created_by,
     responsibleUserId: row.responsible_user_id,
+    previousTaskId: row.previous_task_id ?? null,
   };
 }
 
@@ -213,10 +214,11 @@ interface StoreApi {
     startDate: string;
     dueDate?: string;
     responsibleUserId?: string | null;
+    previousTaskId?: string | null;
   }) => Promise<Task>;
   updateTask: (
     id: string,
-    data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status">>,
+    data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status" | "previousTaskId">>,
   ) => void;
   deleteTask: (id: string) => void;
   toggleTaskDone: (id: string) => void;
@@ -324,6 +326,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       startDate: string;
       dueDate?: string;
       responsibleUserId?: string | null;
+      previousTaskId?: string | null;
     }) => {
       if (!currentUserId) throw new Error("Usuário não autenticado.");
       const { data: row, error } = await supabase
@@ -337,6 +340,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           due_date: data.dueDate,
           created_by: currentUserId,
           responsible_user_id: data.responsibleUserId ?? currentUserId,
+          previous_task_id: data.previousTaskId ?? null,
         })
         .select("*")
         .single();
@@ -352,7 +356,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       data,
     }: {
       id: string;
-      data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status">>;
+      data: Partial<Pick<Task, "name" | "description" | "priority" | "startDate" | "dueDate" | "status" | "previousTaskId">>;
     }) => {
       const payload: import("@/lib/supabase/types").TablesUpdate<"tasks"> = {};
       if (data.name !== undefined) payload.title = data.name;
@@ -361,6 +365,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (data.startDate !== undefined) payload.start_date = data.startDate;
       if (data.dueDate !== undefined) payload.due_date = data.dueDate;
       if (data.status !== undefined) payload.status = data.status;
+      if (data.previousTaskId !== undefined) payload.previous_task_id = data.previousTaskId;
       const { error } = await supabase.from("tasks").update(payload).eq("id", id);
       if (error) throw error;
     },
